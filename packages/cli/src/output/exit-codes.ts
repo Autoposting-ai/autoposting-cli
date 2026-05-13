@@ -11,7 +11,7 @@ export const EXIT_CODES = {
 
 export type ExitCode = (typeof EXIT_CODES)[keyof typeof EXIT_CODES]
 
-// Named sentinel classes used for instanceof checks against @autoposting/sdk errors.
+// Named sentinel classes used for instanceof checks against @autoposting.ai/sdk errors.
 // We match by constructor name so this works even if the SDK hasn't shipped error
 // classes yet (dynamic require would silently fail). When the SDK exports these
 // classes they will inherit from AutopostingError and carry the same names.

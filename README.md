@@ -6,7 +6,7 @@ Manage social media from the terminal.
 
 | Package | Description |
 |---------|-------------|
-| [`@autoposting/sdk`](./packages/sdk) | TypeScript SDK for the Autoposting API |
+| [`@autoposting.ai/sdk`](./packages/sdk) | TypeScript SDK for the Autoposting API |
 | [`autoposting-cli`](./packages/cli) | CLI tool (`autoposting` / `ap` commands) |
 
 ## Install

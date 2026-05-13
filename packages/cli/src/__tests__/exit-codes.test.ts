@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { exitCodeFromError, EXIT_CODES } from '../output/exit-codes.js'
 
-// Minimal error subclasses that mirror @autoposting/sdk error hierarchy.
+// Minimal error subclasses that mirror @autoposting.ai/sdk error hierarchy.
 // These are used to verify that exitCodeFromError maps by constructor name.
 class AutopostingError extends Error {
   constructor(message: string) { super(message); this.name = 'AutopostingError' }

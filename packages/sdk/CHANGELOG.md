@@ -1,4 +1,4 @@
-# @autoposting/sdk
+# @autoposting.ai/sdk
 
 ## 0.2.0
 

@@ -13,4 +13,4 @@
 ### Patch Changes
 
 - Updated dependencies
-  - @autoposting/sdk@0.2.0
+  - @autoposting.ai/sdk@0.2.0

@@ -1,6 +1,6 @@
 import { Command } from 'commander'
-import { Autoposting } from '@autoposting/sdk'
-import type { Platform } from '@autoposting/sdk'
+import { Autoposting } from '@autoposting.ai/sdk'
+import type { Platform } from '@autoposting.ai/sdk'
 import { resolveAuth } from '../auth/auth-manager.js'
 import { createPrinter } from '../output/printer.js'
 import { exitCodeFromError } from '../output/exit-codes.js'

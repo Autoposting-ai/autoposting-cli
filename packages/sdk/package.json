@@ -1,5 +1,5 @@
 {
-  "name": "@autoposting/sdk",
+  "name": "@autoposting.ai/sdk",
   "version": "0.2.0",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

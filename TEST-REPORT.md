@@ -36,7 +36,7 @@ All 133 tests pass across the CLI and SDK packages. Build succeeds without error
 7. `posts-commands.test.ts` — 12 tests (1262ms)
 8. `auth-commands.test.ts` — 8 tests (1832ms)
 
-#### SDK Package (`@autoposting/sdk`)
+#### SDK Package (`@autoposting.ai/sdk`)
 - **Test Files:** 5
 - **Tests:** 57
 - **Duration:** 370ms
@@ -78,7 +78,7 @@ All 133 tests pass across the CLI and SDK packages. Build succeeds without error
 ✅ **All packages type-check successfully**
 
 **Command:** `npx turbo typecheck`
-- `@autoposting/sdk` — ✅ Pass
+- `@autoposting.ai/sdk` — ✅ Pass
 - `autoposting-cli` — ✅ Pass
 - **Total Duration:** 1.314s
 - **Errors:** 0

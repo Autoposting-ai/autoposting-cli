@@ -1,4 +1,4 @@
-import type { Autoposting } from '@autoposting/sdk'
+import type { Autoposting } from '@autoposting.ai/sdk'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 
 type ToolArgs = Record<string, unknown>

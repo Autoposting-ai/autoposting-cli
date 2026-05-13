@@ -4,7 +4,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { Autoposting } from '@autoposting/sdk'
+import { Autoposting } from '@autoposting.ai/sdk'
 import { ALL_TOOLS } from './tools.js'
 import { handleToolCall } from './handler.js'
 
