@@ -51,7 +51,7 @@ export class Autoposting {
       )
     }
     this._apiKey = key
-    this.baseUrl = (config.baseUrl ?? 'https://api.autoposting.ai').replace(/\/$/, '')
+    this.baseUrl = (config.baseUrl ?? 'https://app.autoposting.ai').replace(/\/$/, '')
     this.timeout = config.timeout ?? 30_000
     this.extraHeaders = config.headers ?? {}
     this.authSource = config.authSource ?? 'api-key'

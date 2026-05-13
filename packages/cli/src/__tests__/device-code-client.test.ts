@@ -3,7 +3,7 @@ import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 import { requestDeviceCode, pollDeviceCode } from '../auth/device-code-client.js'
 
-const BASE = 'https://api.autoposting.ai'
+const BASE = 'https://app.autoposting.ai'
 
 const server = setupServer()
 

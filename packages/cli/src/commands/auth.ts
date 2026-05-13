@@ -11,7 +11,7 @@ import {
 import { resolveAuth } from '../auth/auth-manager.js'
 import { requestDeviceCode, pollDeviceCode } from '../auth/device-code-client.js'
 
-const DEFAULT_BASE_URL = 'https://api.autoposting.ai'
+const DEFAULT_BASE_URL = 'https://app.autoposting.ai'
 
 function resolveBaseUrl(globals: { baseUrl?: string }): string {
   return globals.baseUrl ?? process.env.AUTOPOSTING_BASE_URL ?? DEFAULT_BASE_URL

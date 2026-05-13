@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
 import type { Agent, AgentRun } from '../types/agents'
 
-const BASE = 'https://api.autoposting.ai'
+const BASE = 'https://app.autoposting.ai'
 
 const mockAgent: Agent = {
   id: 'agent-1',

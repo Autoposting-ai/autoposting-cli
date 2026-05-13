@@ -1,6 +1,6 @@
 {
   "name": "@autoposting.ai/sdk",
-  "version": "0.2.3",
+  "version": "0.2.31",
   "license": "MIT",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

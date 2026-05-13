@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
 import type { UsageSummary } from '../types/usage'
 
-const BASE = 'https://api.autoposting.ai'
+const BASE = 'https://app.autoposting.ai'
 
 const server = setupServer()
 

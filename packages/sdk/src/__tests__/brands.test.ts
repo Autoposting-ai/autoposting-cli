@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
 import type { Brand, PlatformConnection } from '../types/brands'
 
-const BASE = 'https://api.autoposting.ai'
+const BASE = 'https://app.autoposting.ai'
 
 const mockBrand: Brand = {
   id: 'brand-1',

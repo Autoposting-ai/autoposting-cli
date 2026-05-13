@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
 import type { Idea } from '../types/kb'
 
-const BASE = 'https://api.autoposting.ai'
+const BASE = 'https://app.autoposting.ai'
 
 const mockIdea: Idea = {
   id: 'idea-1',

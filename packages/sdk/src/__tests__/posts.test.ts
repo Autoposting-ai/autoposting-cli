@@ -5,7 +5,7 @@ import { Autoposting } from '../client'
 import type { Post } from '../types/posts'
 import type { PaginatedResponse } from '../types'
 
-const BASE = 'https://api.autoposting.ai'
+const BASE = 'https://app.autoposting.ai'
 
 const server = setupServer()
 

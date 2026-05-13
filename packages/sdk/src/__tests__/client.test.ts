@@ -11,7 +11,7 @@ import {
   ServerError,
 } from '../errors'
 
-const BASE = 'https://api.autoposting.ai'
+const BASE = 'https://app.autoposting.ai'
 
 const server = setupServer()
 
