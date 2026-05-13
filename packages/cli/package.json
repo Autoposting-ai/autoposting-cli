@@ -21,7 +21,9 @@
   },
   "dependencies": {
     "@autoposting/sdk": "*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^13.1.0",
+    "open": "^11.0.0",
     "ora": "^9.4.0"
   },
   "devDependencies": {
