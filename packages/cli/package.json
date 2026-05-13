@@ -1,0 +1,29 @@
+{
+  "name": "autoposting-cli",
+  "version": "0.1.0",
+  "bin": {
+    "autoposting": "./dist/cli.cjs",
+    "ap": "./dist/cli.cjs"
+  },
+  "files": ["dist"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@autoposting/sdk": "*",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "tsup": "*",
+    "typescript": "*",
+    "vitest": "*"
+  }
+}
