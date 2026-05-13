@@ -11,7 +11,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -24,6 +26,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "msw": "^2.14.6",
     "tsup": "*",
     "typescript": "*",
     "vitest": "*"
