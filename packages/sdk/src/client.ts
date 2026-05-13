@@ -1,19 +1,24 @@
 import { VERSION } from './version'
 import { createError, RateLimitError } from './errors'
 import { AgentsResource } from './resources/agents'
+import { BillingResource } from './resources/billing'
 import { BrandsResource } from './resources/brands'
 import { CarouselsResource } from './resources/carousels'
 import { ClipsResource } from './resources/clips'
 import { PostsResource } from './resources/posts'
 import { KbResource } from './resources/kb'
 import { IdeasResource } from './resources/ideas'
+import { UsageResource } from './resources/usage'
 import { WebhooksResource } from './resources/webhooks'
+import { WorkspacesResource } from './resources/workspaces'
 
 export interface AutopostingConfig {
   apiKey?: string
   baseUrl?: string
   timeout?: number
   headers?: Record<string, string>
+  /** Mark the auth source so workspace-switching can enforce API key restrictions. */
+  authSource?: 'api-key' | 'session'
 }
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
@@ -24,14 +29,19 @@ export class Autoposting {
   readonly baseUrl: string
   readonly timeout: number
   private readonly extraHeaders: Record<string, string>
+  /** Indicates how the client was authenticated; used by WorkspacesResource. */
+  readonly authSource: 'api-key' | 'session'
+  readonly agents: AgentsResource
+  readonly billing: BillingResource
   readonly brands: BrandsResource
   readonly carousels: CarouselsResource
   readonly clips: ClipsResource
   readonly posts: PostsResource
   readonly kb: KbResource
   readonly ideas: IdeasResource
-  readonly agents: AgentsResource
+  readonly usage: UsageResource
   readonly webhooks: WebhooksResource
+  readonly workspaces: WorkspacesResource
 
   constructor(config: AutopostingConfig = {}) {
     const key = config.apiKey ?? process.env.AUTOPOSTING_API_KEY
@@ -44,14 +54,18 @@ export class Autoposting {
     this.baseUrl = (config.baseUrl ?? 'https://api.autoposting.ai').replace(/\/$/, '')
     this.timeout = config.timeout ?? 30_000
     this.extraHeaders = config.headers ?? {}
+    this.authSource = config.authSource ?? 'api-key'
+    this.agents = new AgentsResource(this)
+    this.billing = new BillingResource(this)
     this.brands = new BrandsResource(this)
     this.carousels = new CarouselsResource(this)
     this.clips = new ClipsResource(this)
     this.posts = new PostsResource(this)
     this.kb = new KbResource(this)
     this.ideas = new IdeasResource(this)
-    this.agents = new AgentsResource(this)
+    this.usage = new UsageResource(this)
     this.webhooks = new WebhooksResource(this)
+    this.workspaces = new WorkspacesResource(this)
   }
 
   async request<T = unknown>(
