@@ -54,10 +54,14 @@ describe('ap auth login', () => {
     expect(result.stdout).toContain('Logged in')
   })
 
-  it('exits with code 2 when --api-key is missing', async () => {
-    const result = await ap(['auth', 'login'])
+  it('exits with code 2 when device code request fails (no --api-key)', async () => {
+    // Point to a port that refuses connections so device code fetch fails immediately
+    const result = await ap(['auth', 'login', '--base-url', 'http://127.0.0.1:19999'], {
+      ...baseEnv,
+      AUTOPOSTING_BASE_URL: 'http://127.0.0.1:19999',
+    })
     expect(result.exitCode).toBe(2)
-    expect(result.stderr).toMatch(/--api-key/)
+    expect(result.stderr).toMatch(/Error:/)
   })
 })
 

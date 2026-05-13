@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { execSync } from 'node:child_process'
 import {
   deleteAllProfiles,
   deleteProfile,
@@ -8,32 +9,129 @@ import {
   setActiveProfile,
 } from '../auth/credential-store.js'
 import { resolveAuth } from '../auth/auth-manager.js'
+import { requestDeviceCode, pollDeviceCode } from '../auth/device-code-client.js'
+
+const DEFAULT_BASE_URL = 'https://api.autoposting.ai'
+
+function resolveBaseUrl(globals: { baseUrl?: string }): string {
+  return globals.baseUrl ?? process.env.AUTOPOSTING_BASE_URL ?? DEFAULT_BASE_URL
+}
+
+function tryOpenUrl(url: string): void {
+  try {
+    // Attempt to open browser; ignore failures (CI, headless, etc.)
+    const platform = process.platform
+    if (platform === 'darwin') execSync(`open "${url}"`, { stdio: 'ignore' })
+    else if (platform === 'win32') execSync(`start "" "${url}"`, { stdio: 'ignore' })
+    else execSync(`xdg-open "${url}"`, { stdio: 'ignore' })
+  } catch {
+    // Non-fatal: user can open URL manually
+  }
+}
 
 export function createAuthCommand(): Command {
   const auth = new Command('auth').description('Manage authentication and profiles')
 
-  // ap auth login --api-key <key> [--profile <name>]
+  // ap auth login [--api-key <key>] [--profile <name>] [--base-url <url>]
   // Note: --api-key is also a root-level global option on the program. Commander consumes
   // options left-to-right so the root picks it up first. We use optsWithGlobals() to
   // merge root + local options and read whichever level captured the flag.
   auth
     .command('login')
-    .description('Store an API key (device code flow coming in #13)')
-    .option('--api-key <key>', 'API key to store')
+    .description('Log in via browser device code flow, or store an API key directly with --api-key')
+    .option('--api-key <key>', 'API key to store directly (skips device code flow)')
     .option('--profile <name>', 'Profile name to save under', 'default')
-    .action((localOpts: { apiKey?: string; profile: string }, cmd: Command) => {
-      const opts = cmd.optsWithGlobals<{ apiKey?: string; profile: string }>()
-      if (!opts.apiKey) {
-        console.error('Error: --api-key <key> is required (device code flow not yet implemented)')
+    .option('--base-url <url>', 'API base URL (overrides AUTOPOSTING_BASE_URL)')
+    .action(async (localOpts: { apiKey?: string; profile: string; baseUrl?: string }, cmd: Command) => {
+      const opts = cmd.optsWithGlobals<{ apiKey?: string; profile: string; baseUrl?: string }>()
+
+      // Fast path: --api-key provided, store directly
+      if (opts.apiKey) {
+        saveProfile(opts.profile, {
+          apiKey: opts.apiKey,
+          createdAt: new Date().toISOString(),
+        })
+        console.log(`Logged in. Profile "${opts.profile}" saved.`)
+        return
+      }
+
+      // Device code flow
+      const baseUrl = resolveBaseUrl(opts)
+
+      let deviceCodeResp
+      try {
+        deviceCodeResp = await requestDeviceCode(baseUrl)
+      } catch (err) {
+        console.error(`Error: ${(err as Error).message}`)
         process.exit(2)
       }
 
-      saveProfile(opts.profile, {
-        apiKey: opts.apiKey,
-        createdAt: new Date().toISOString(),
-      })
+      const { deviceCode, userCode, verificationUri } = deviceCodeResp
+      let pollInterval = deviceCodeResp.interval
 
-      console.log(`Logged in. Profile "${opts.profile}" saved.`)
+      console.log(`\nEnter code ${userCode} at ${verificationUri}\n`)
+      tryOpenUrl(verificationUri)
+
+      // Spinner-style wait indicator using process.stdout so we can overwrite it
+      const frames = ['|', '/', '-', '\\']
+      let frameIdx = 0
+      const spinnerInterval = setInterval(() => {
+        process.stdout.write(`\rWaiting for authorization... ${frames[frameIdx++ % frames.length]}`)
+      }, 100)
+
+      const clearSpinner = () => {
+        clearInterval(spinnerInterval)
+        process.stdout.write('\r\x1b[K') // clear spinner line
+      }
+
+      // Poll loop
+      while (true) {
+        await new Promise<void>((resolve) => setTimeout(resolve, pollInterval * 1000))
+
+        let result
+        try {
+          result = await pollDeviceCode(baseUrl, deviceCode)
+        } catch (err) {
+          clearSpinner()
+          console.error(`Error: ${(err as Error).message}`)
+          process.exit(2)
+        }
+
+        switch (result.status) {
+          case 'complete': {
+            clearSpinner()
+            const token = result.sessionToken!
+            saveProfile(opts.profile, {
+              apiKey: token,
+              createdAt: new Date().toISOString(),
+            })
+            console.log(`Logged in. Profile "${opts.profile}" saved.`)
+            return
+          }
+
+          case 'expired_token':
+            clearSpinner()
+            console.error('Error: Authorization expired. Run `ap auth login` again.')
+            process.exit(2)
+            break
+
+          case 'access_denied':
+            clearSpinner()
+            console.error('Error: Access denied.')
+            process.exit(2)
+            break
+
+          case 'slow_down':
+            // Double the interval as instructed by server
+            pollInterval = result.interval ?? pollInterval * 2
+            break
+
+          case 'authorization_pending':
+          default:
+            // Continue polling
+            break
+        }
+      }
     })
 
   // ap auth logout [--all]
