@@ -2,9 +2,11 @@
 
 # Autoposting CLI
 
-**Manage your social media empire from the terminal.**
+**The open-source CLI and TypeScript SDK for AI-powered social media automation.**
 
-Schedule posts, manage brands, run AI agents, generate content ideas, clip videos, build carousels, and more — all from a single command-line tool.
+Schedule posts, manage brands, run AI content agents, generate ideas, clip videos, build carousels, and publish to X (Twitter), LinkedIn, Instagram, Threads, and YouTube — from your terminal, your code, or your AI agent.
+
+Built for developers, marketers, and AI agents who need programmatic social media management.
 
 [![npm SDK](https://img.shields.io/npm/v/@autoposting.ai/sdk?label=%40autoposting.ai%2Fsdk&color=blue)](https://www.npmjs.com/package/@autoposting.ai/sdk)
 [![npm CLI](https://img.shields.io/npm/v/@autoposting.ai/cli?label=%40autoposting.ai%2Fcli&color=blue)](https://www.npmjs.com/package/@autoposting.ai/cli)
@@ -421,25 +423,70 @@ git push origin main --tags    # triggers npm publish via GitHub Actions
 
 ---
 
+## Supported Platforms
+
+| Platform | Post | Schedule | AI Rewrite | AI Score | Video Clips | Carousels |
+|----------|------|----------|------------|----------|-------------|-----------|
+| X (Twitter) | Yes | Yes | Yes | Yes | Yes | Yes |
+| LinkedIn | Yes | Yes | Yes | Yes | Yes | Yes |
+| Instagram | Yes | Yes | Yes | Yes | Yes | Yes |
+| Threads | Yes | Yes | Yes | Yes | — | — |
+| YouTube | Yes | Yes | Yes | Yes | Yes | — |
+
+---
+
+## Use Cases
+
+| Use Case | How |
+|----------|-----|
+| **AI agent social media posting** | Connect via MCP — Claude, Cursor, or any AI agent can post autonomously |
+| **Automated social media scheduling** | `ap posts create` + `ap posts schedule` from scripts or CI/CD |
+| **AI content generation pipeline** | Generate ideas → AI-rewrite → AI-score → schedule → publish |
+| **Multi-platform social media management** | One command to post to X, LinkedIn, Instagram, Threads, YouTube |
+| **Social media API integration** | Use the TypeScript SDK (`@autoposting.ai/sdk`) in your own apps |
+| **CI/CD release announcements** | Auto-post when you deploy — pipe into `ap posts create --json` |
+| **Knowledge-driven content creation** | Ingest docs into KB → generate posts from your own content |
+| **Video clip automation** | Import videos → auto-clip → render → publish |
+| **Carousel generation** | AI-generate slide decks for LinkedIn and Instagram |
+| **Brand management at scale** | Manage multiple brands, platforms, and agents from one CLI |
+| **Webhook-driven workflows** | Get real-time notifications when posts publish, fail, or get engagement |
+
+---
+
 ## FAQ
 
 **Q: What platforms does Autoposting support?**
 A: X (Twitter), LinkedIn, Instagram, Threads, and YouTube.
 
+**Q: Can AI agents use this to post on social media?**
+A: Yes. Run `ap mcp` to start the MCP server. Claude Desktop, Cursor, and any MCP-compatible AI agent can then create posts, schedule content, run AI agents, and manage your entire social media presence through natural language.
+
 **Q: How do I get an API key?**
 A: Sign up at [autoposting.ai](https://autoposting.ai), go to Settings > API Keys. Keys use the `sk-social-` prefix.
 
-**Q: Can I use the CLI in Docker?**
-A: Yes. `docker run autoposting/cli posts list`
+**Q: Can I use this in Docker / CI/CD?**
+A: Yes. Use `AUTOPOSTING_API_KEY` env var + `--json` flag for machine-readable output. The Dockerfile is included.
 
 **Q: What's the difference between `ap auth login` and `--api-key`?**
 A: `ap auth login` opens a browser for OAuth (device code flow) and stores credentials locally. `--api-key` is for CI/CD or one-off commands — no browser needed.
 
-**Q: Does `ap mcp` work with Cursor?**
+**Q: Does `ap mcp` work with Cursor / Claude Desktop / other AI tools?**
 A: Yes. Any MCP-compatible client can connect via stdio. Configure the command as `ap mcp` with your API key in the environment.
+
+**Q: How is this different from Postiz CLI or Buffer API?**
+A: Autoposting CLI includes built-in AI features (content rewriting, scoring, idea generation, carousel AI), an MCP server for AI agent integration, and a full TypeScript SDK — not just REST wrappers.
 
 **Q: What Node.js version do I need?**
 A: Node.js 20 or later.
+
+---
+
+## Related
+
+- **[@autoposting.ai/sdk](https://www.npmjs.com/package/@autoposting.ai/sdk)** — TypeScript SDK for programmatic social media automation
+- **[@autoposting.ai/cli](https://www.npmjs.com/package/@autoposting.ai/cli)** — This CLI tool
+- **[Autoposting.ai](https://autoposting.ai)** — The web platform
+- **[API Documentation](https://autoposting.ai/docs)** — Full API reference
 
 ---
 
@@ -453,7 +500,7 @@ MIT — see [LICENSE](LICENSE).
 
 ## About
 
-Built by **[Autoposting.ai](https://autoposting.ai)** — the multi-channel social media scheduling and AI content platform.
+Built by **[Autoposting.ai](https://autoposting.ai)** — the AI-powered social media scheduling and content automation platform for X, LinkedIn, Instagram, Threads, and YouTube.
 
 **Connect:** [autoposting.ai](https://autoposting.ai) · [@iuditg](https://x.com/iuditg) · [GitHub](https://github.com/Autoposting-ai)
 
