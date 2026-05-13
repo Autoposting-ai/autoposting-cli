@@ -1,12 +1,14 @@
 {
   "name": "@autoposting.ai/cli",
-  "version": "0.2.2",
+  "version": "0.2.3",
+  "license": "MIT",
   "bin": {
     "autoposting": "./dist/cli.cjs",
     "ap": "./dist/cli.cjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"

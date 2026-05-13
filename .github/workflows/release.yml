@@ -20,6 +20,16 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
+      - name: Verify version sync
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          SDK_VER=$(node -p "require('./packages/sdk/package.json').version")
+          CLI_VER=$(node -p "require('./packages/cli/package.json').version")
+          echo "Tag: $TAG | SDK: $SDK_VER | CLI: $CLI_VER"
+          if [ "$TAG" != "$SDK_VER" ] || [ "$TAG" != "$CLI_VER" ]; then
+            echo "::error::Version mismatch! Tag v$TAG but SDK=$SDK_VER CLI=$CLI_VER"
+            exit 1
+          fi
       - run: npx turbo build
       - run: npx turbo test
       - name: Publish SDK
