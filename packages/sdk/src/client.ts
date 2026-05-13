@@ -13,7 +13,8 @@ export interface AutopostingConfig {
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export class Autoposting {
-  readonly apiKey: string
+  /** @internal Not part of the public API — use SDK methods to make requests. */
+  private readonly _apiKey: string
   readonly baseUrl: string
   readonly timeout: number
   private readonly extraHeaders: Record<string, string>
@@ -27,7 +28,7 @@ export class Autoposting {
         'API key is required. Pass apiKey in config or set AUTOPOSTING_API_KEY env var.',
       )
     }
-    this.apiKey = key
+    this._apiKey = key
     this.baseUrl = (config.baseUrl ?? 'https://api.autoposting.ai').replace(/\/$/, '')
     this.timeout = config.timeout ?? 30_000
     this.extraHeaders = config.headers ?? {}
@@ -55,7 +56,7 @@ export class Autoposting {
 
     const headers: Record<string, string> = {
       'content-type': 'application/json',
-      authorization: `Bearer ${this.apiKey}`,
+      authorization: `Bearer ${this._apiKey}`,
       'user-agent': `autoposting-sdk/${VERSION}`,
       'x-source': 'sdk',
       ...this.extraHeaders,

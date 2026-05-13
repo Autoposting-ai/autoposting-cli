@@ -34,9 +34,9 @@ export function writeCredentials(creds: CredentialsFile): void {
   const filePath = getCredentialsPath()
   const dir = path.dirname(filePath)
 
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
-  }
+  // Use { recursive: true } so mkdirSync is idempotent (avoids TOCTOU race between
+  // existsSync + mkdirSync). Mode 0o700 ensures only the owning user can read the dir.
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
 
   fs.writeFileSync(filePath, JSON.stringify(creds, null, 2), { encoding: 'utf8', mode: 0o600 })
 
