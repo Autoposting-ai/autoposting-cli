@@ -1,5 +1,5 @@
 {
-  "name": "autoposting-cli",
+  "name": "@autoposting.ai/cli",
   "version": "0.2.0",
   "bin": {
     "autoposting": "./dist/cli.cjs",
