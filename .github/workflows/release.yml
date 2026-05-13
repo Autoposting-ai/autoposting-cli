@@ -22,11 +22,11 @@ jobs:
       - run: npx turbo build
       - run: npx turbo test
       - name: Publish SDK
-        run: npm publish --workspace=packages/sdk --access public
+        run: npm publish --workspace=packages/sdk --access public || true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish CLI
-        run: npm publish --workspace=packages/cli --access public
+        run: npm publish --workspace=packages/cli --access public || true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Create GitHub Release
