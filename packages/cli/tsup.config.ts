@@ -8,6 +8,10 @@ export default defineConfig({
   outExtension: () => ({ js: '.cjs' }),
   clean: true,
   sourcemap: true,
+  // Bundle the workspace SDK so the CLI binary is fully self-contained.
+  // Without this, Node resolves @autoposting/sdk via the workspace symlink at
+  // runtime and fails if the SDK dist hasn't been installed into node_modules.
+  noExternal: ['@autoposting/sdk'],
   // esbuild banner only works for .js keys; for .cjs we prepend shebang via onSuccess
   async onSuccess() {
     const outFile = path.resolve('dist/cli.cjs')

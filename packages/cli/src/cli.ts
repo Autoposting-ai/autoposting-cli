@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
 import { createAuthCommand } from './commands/auth.js'
+import { createBrandsCommand } from './commands/brands.js'
+import { createPostsCommand } from './commands/posts.js'
 import { disableColor } from './output/index.js'
 
 const program = new Command()
@@ -18,5 +20,7 @@ const program = new Command()
   })
 
 program.addCommand(createAuthCommand())
+program.addCommand(createBrandsCommand())
+program.addCommand(createPostsCommand())
 
 program.parse()

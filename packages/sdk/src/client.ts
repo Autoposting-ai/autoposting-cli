@@ -1,5 +1,7 @@
 import { VERSION } from './version'
 import { createError, RateLimitError } from './errors'
+import { BrandsResource } from './resources/brands'
+import { PostsResource } from './resources/posts'
 
 export interface AutopostingConfig {
   apiKey?: string
@@ -15,6 +17,8 @@ export class Autoposting {
   readonly baseUrl: string
   readonly timeout: number
   private readonly extraHeaders: Record<string, string>
+  readonly brands: BrandsResource
+  readonly posts: PostsResource
 
   constructor(config: AutopostingConfig = {}) {
     const key = config.apiKey ?? process.env.AUTOPOSTING_API_KEY
@@ -27,6 +31,8 @@ export class Autoposting {
     this.baseUrl = (config.baseUrl ?? 'https://api.autoposting.ai').replace(/\/$/, '')
     this.timeout = config.timeout ?? 30_000
     this.extraHeaders = config.headers ?? {}
+    this.brands = new BrandsResource(this)
+    this.posts = new PostsResource(this)
   }
 
   async request<T = unknown>(
