@@ -1,7 +1,13 @@
 import { VERSION } from './version'
 import { createError, RateLimitError } from './errors'
+import { AgentsResource } from './resources/agents'
 import { BrandsResource } from './resources/brands'
+import { CarouselsResource } from './resources/carousels'
+import { ClipsResource } from './resources/clips'
 import { PostsResource } from './resources/posts'
+import { KbResource } from './resources/kb'
+import { IdeasResource } from './resources/ideas'
+import { WebhooksResource } from './resources/webhooks'
 
 export interface AutopostingConfig {
   apiKey?: string
@@ -19,7 +25,13 @@ export class Autoposting {
   readonly timeout: number
   private readonly extraHeaders: Record<string, string>
   readonly brands: BrandsResource
+  readonly carousels: CarouselsResource
+  readonly clips: ClipsResource
   readonly posts: PostsResource
+  readonly kb: KbResource
+  readonly ideas: IdeasResource
+  readonly agents: AgentsResource
+  readonly webhooks: WebhooksResource
 
   constructor(config: AutopostingConfig = {}) {
     const key = config.apiKey ?? process.env.AUTOPOSTING_API_KEY
@@ -33,7 +45,13 @@ export class Autoposting {
     this.timeout = config.timeout ?? 30_000
     this.extraHeaders = config.headers ?? {}
     this.brands = new BrandsResource(this)
+    this.carousels = new CarouselsResource(this)
+    this.clips = new ClipsResource(this)
     this.posts = new PostsResource(this)
+    this.kb = new KbResource(this)
+    this.ideas = new IdeasResource(this)
+    this.agents = new AgentsResource(this)
+    this.webhooks = new WebhooksResource(this)
   }
 
   async request<T = unknown>(
@@ -54,12 +72,16 @@ export class Autoposting {
       url = `${url}?${params.toString()}`
     }
 
+    // FormData must not have a content-type header — fetch sets it with the multipart boundary
+    const isFormData = body instanceof FormData
     const headers: Record<string, string> = {
-      'content-type': 'application/json',
       authorization: `Bearer ${this._apiKey}`,
       'user-agent': `autoposting-sdk/${VERSION}`,
       'x-source': 'sdk',
       ...this.extraHeaders,
+    }
+    if (!isFormData) {
+      headers['content-type'] = 'application/json'
     }
 
     const controller = new AbortController()
@@ -70,7 +92,7 @@ export class Autoposting {
       response = await fetch(url, {
         method,
         headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
+        body: isFormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
         signal: controller.signal,
       })
     } finally {

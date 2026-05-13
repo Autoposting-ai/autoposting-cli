@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
+import { createAgentsCommand } from './commands/agents.js'
 import { createAuthCommand } from './commands/auth.js'
 import { createBrandsCommand } from './commands/brands.js'
+import { createCarouselsCommand } from './commands/carousels.js'
+import { createClipsCommand } from './commands/clips.js'
 import { createPostsCommand } from './commands/posts.js'
+import { createKbCommand } from './commands/kb.js'
+import { createIdeasCommand } from './commands/ideas.js'
+import { createWebhooksCommand } from './commands/webhooks.js'
 import { disableColor } from './output/index.js'
 
 const program = new Command()
@@ -21,6 +27,12 @@ const program = new Command()
 
 program.addCommand(createAuthCommand())
 program.addCommand(createBrandsCommand())
+program.addCommand(createCarouselsCommand())
+program.addCommand(createClipsCommand())
 program.addCommand(createPostsCommand())
+program.addCommand(createAgentsCommand())
+program.addCommand(createKbCommand())
+program.addCommand(createIdeasCommand())
+program.addCommand(createWebhooksCommand())
 
 program.parse()
