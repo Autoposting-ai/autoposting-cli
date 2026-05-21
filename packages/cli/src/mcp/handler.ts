@@ -1,15 +1,39 @@
 import type { Autoposting } from '@autoposting.ai/sdk'
+import type { Platform } from '@autoposting.ai/sdk'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 
 type ToolArgs = Record<string, unknown>
+const PLATFORMS: Platform[] = [
+  'x',
+  'linkedin',
+  'instagram',
+  'threads',
+  'youtube',
+]
+const PLATFORM_SET = new Set<string>(PLATFORMS)
 
 function ok(data: unknown): CallToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] }
 }
 
-function parsePlatforms(raw: unknown): string[] {
+function fail(error: unknown): CallToolResult {
+  const message = error instanceof Error ? error.message : String(error)
+  return { content: [{ type: 'text', text: message }], isError: true }
+}
+
+function parsePlatforms(raw: unknown): Platform[] {
   if (typeof raw !== 'string') return []
-  return raw.split(',').map((p) => p.trim())
+  const platforms = raw
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
+  const invalid = platforms.filter((platform) => !PLATFORM_SET.has(platform))
+  if (invalid.length > 0) {
+    throw new Error(
+      `Invalid platform(s): ${invalid.join(', ')}. Expected one of: ${PLATFORMS.join(', ')}.`,
+    )
+  }
+  return platforms as Platform[]
 }
 
 function parseEvents(raw: unknown): string[] {
@@ -22,12 +46,29 @@ export async function handleToolCall(
   args: ToolArgs,
   client: Autoposting,
 ): Promise<CallToolResult> {
+  try {
+    return await dispatchToolCall(name, args, client)
+  } catch (error) {
+    return fail(error)
+  }
+}
+
+async function dispatchToolCall(
+  name: string,
+  args: ToolArgs,
+  client: Autoposting,
+): Promise<CallToolResult> {
   switch (name) {
     // Posts
     case 'list-posts': {
       const result = await client.posts.list({
         brandSlug: args.brandSlug as string | undefined,
-        status: args.status as 'draft' | 'scheduled' | 'published' | 'failed' | undefined,
+        status: args.status as
+          | 'draft'
+          | 'scheduled'
+          | 'published'
+          | 'failed'
+          | undefined,
         limit: args.limit as number | undefined,
         page: args.page as number | undefined,
       })
@@ -41,8 +82,10 @@ export async function handleToolCall(
       const result = await client.posts.create({
         brandSlug: args.brandSlug as string,
         text: args.text as string,
-        platforms: parsePlatforms(args.platforms) as ReturnType<typeof parsePlatforms>,
-        ...(args.scheduledAt ? { scheduledAt: args.scheduledAt as string } : {}),
+        platforms: parsePlatforms(args.platforms),
+        ...(args.scheduledAt
+          ? { scheduledAt: args.scheduledAt as string }
+          : {}),
       })
       return ok(result)
     }
@@ -51,10 +94,12 @@ export async function handleToolCall(
         ...(args.text ? { text: args.text as string } : {}),
         ...(args.platforms
           ? {
-              platforms: parsePlatforms(args.platforms) as ReturnType<typeof parsePlatforms>,
+              platforms: parsePlatforms(args.platforms),
             }
           : {}),
-        ...(args.scheduledAt ? { scheduledAt: args.scheduledAt as string } : {}),
+        ...(args.scheduledAt
+          ? { scheduledAt: args.scheduledAt as string }
+          : {}),
       })
       return ok(result)
     }
@@ -67,7 +112,10 @@ export async function handleToolCall(
       return ok(result)
     }
     case 'schedule-post': {
-      const result = await client.posts.schedule(args.id as string, args.scheduledAt as string)
+      const result = await client.posts.schedule(
+        args.id as string,
+        args.scheduledAt as string,
+      )
       return ok(result)
     }
     case 'retry-post': {
@@ -182,11 +230,17 @@ export async function handleToolCall(
       return ok({ deleted: true, id: args.id })
     }
     case 'search-kb': {
-      const result = await client.kb.search(args.id as string, args.query as string)
+      const result = await client.kb.search(
+        args.id as string,
+        args.query as string,
+      )
       return ok(result)
     }
     case 'ingest-kb': {
-      const result = await client.kb.ingestUrl(args.id as string, args.url as string)
+      const result = await client.kb.ingestUrl(
+        args.id as string,
+        args.url as string,
+      )
       return ok(result)
     }
     case 'kb-docs': {
@@ -294,7 +348,9 @@ export async function handleToolCall(
       const result = await client.webhooks.update(args.id as string, {
         ...(args.url ? { url: args.url as string } : {}),
         ...(args.events ? { events: parseEvents(args.events) } : {}),
-        ...(args.active !== undefined ? { active: args.active as boolean } : {}),
+        ...(args.active !== undefined
+          ? { active: args.active as boolean }
+          : {}),
       })
       return ok(result)
     }

@@ -39,7 +39,11 @@ describe('ap doctor', () => {
       ...baseEnv,
       AUTOPOSTING_API_KEY: 'sk-social-test',
     })
-    const parsed = JSON.parse(result.stdout) as Array<{ name: string; status: string; value: string }>
+    const parsed = JSON.parse(result.stdout) as Array<{
+      name: string
+      status: string
+      value: string
+    }>
     expect(Array.isArray(parsed)).toBe(true)
     expect(parsed.some((c) => c.name === 'CLI Version')).toBe(true)
     expect(parsed.some((c) => c.name === 'Node.js')).toBe(true)
@@ -52,7 +56,11 @@ describe('ap doctor', () => {
     const result = await ap(['doctor', '--json'])
     // Auth check fails → exit 1
     expect(result.exitCode).toBe(1)
-    const parsed = JSON.parse(result.stdout) as Array<{ name: string; status: string; value: string }>
+    const parsed = JSON.parse(result.stdout) as Array<{
+      name: string
+      status: string
+      value: string
+    }>
     const authCheck = parsed.find((c) => c.name === 'Auth')
     expect(authCheck).toBeDefined()
     expect(authCheck?.status).toBe('fail')
@@ -97,7 +105,10 @@ describe('ap whoami', () => {
       AUTOPOSTING_API_KEY: 'sk-social-testkey',
     })
     expect(result.exitCode).toBe(0)
-    const parsed = JSON.parse(result.stdout) as { source: string; apiKey: string }
+    const parsed = JSON.parse(result.stdout) as {
+      source: string
+      apiKey: string
+    }
     expect(parsed.source).toBe('env')
     expect(parsed.apiKey).toMatch(/^sk-socia\*+$/)
   })
@@ -122,7 +133,9 @@ describe('ap open', () => {
   it('--no-browser with billing section prints billing URL', async () => {
     const result = await ap(['open', 'billing', '--no-browser'])
     expect(result.exitCode).toBe(0)
-    expect(result.stdout.trim()).toBe('https://app.autoposting.ai/settings/billing')
+    expect(result.stdout.trim()).toBe(
+      'https://app.autoposting.ai/settings/billing',
+    )
   })
 
   it('exits 1 for unknown section', async () => {
@@ -155,7 +168,7 @@ describe('ap completion', () => {
   it('outputs fish completion script', async () => {
     const result = await ap(['completion', 'fish'])
     expect(result.exitCode).toBe(0)
-    expect(result.stdout).toContain("complete -c ap")
+    expect(result.stdout).toContain('complete -c ap')
     expect(result.stdout).toContain('doctor')
   })
 
@@ -185,5 +198,13 @@ describe('ap --help', () => {
     expect(result.stdout).toContain('open')
     expect(result.stdout).toContain('update')
     expect(result.stdout).toContain('completion')
+  })
+})
+
+describe('ap --version', () => {
+  it('reports the published package version, not a stale placeholder', async () => {
+    const result = await ap(['--version'])
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout.trim()).toBe('0.2.31')
   })
 })

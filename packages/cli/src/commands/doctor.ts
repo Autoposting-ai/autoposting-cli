@@ -1,9 +1,9 @@
 import { Command } from 'commander'
+import { VERSION } from '@autoposting.ai/sdk'
 import { resolveAuth } from '../auth/auth-manager.js'
 import { getCredentialsPath } from '../auth/credential-store.js'
 import fs from 'node:fs'
 
-const VERSION = '0.1.0'
 const API_HEALTH_URL = 'https://app.autoposting.ai/api/health'
 
 type CheckResult = {
@@ -44,10 +44,16 @@ async function runChecks(): Promise<CheckResult[]> {
     results.push({
       name: 'Credentials',
       status: isSecure ? 'pass' : 'warn',
-      value: isSecure ? `${credPath} (0600)` : `${credPath} (mode ${mode.toString(8)} — expected 0600)`,
+      value: isSecure
+        ? `${credPath} (0600)`
+        : `${credPath} (mode ${mode.toString(8)} — expected 0600)`,
     })
   } catch {
-    results.push({ name: 'Credentials', status: 'warn', value: 'no credentials file found' })
+    results.push({
+      name: 'Credentials',
+      status: 'warn',
+      value: 'no credentials file found',
+    })
   }
 
   // API health
@@ -81,8 +87,10 @@ export function createDoctorCommand(): Command {
         console.log(JSON.stringify(results, null, 2))
       } else {
         for (const r of results) {
-          const icon = r.status === 'pass' ? '✓' : r.status === 'warn' ? '!' : '✗'
-          const label = r.status === 'pass' ? 'pass' : r.status === 'warn' ? 'warn' : 'FAIL'
+          const icon =
+            r.status === 'pass' ? '✓' : r.status === 'warn' ? '!' : '✗'
+          const label =
+            r.status === 'pass' ? 'pass' : r.status === 'warn' ? 'warn' : 'FAIL'
           console.log(`  ${icon} ${r.name.padEnd(16)} [${label}]  ${r.value}`)
         }
       }

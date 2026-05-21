@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
+import { VERSION } from '@autoposting.ai/sdk'
 import { createAgentsCommand } from './commands/agents.js'
 import { createAuthCommand } from './commands/auth.js'
 import { createBillingCommand } from './commands/billing.js'
@@ -23,7 +24,7 @@ import { disableColor } from './output/index.js'
 const program = new Command()
   .name('autoposting')
   .description('Autoposting CLI — manage social media from the terminal')
-  .version('0.1.0')
+  .version(VERSION)
   .option('--json', 'Output as JSON')
   .option('--quiet', 'Suppress spinners and non-essential output')
   .option('--format <type>', 'Output format: table, json', 'table')
