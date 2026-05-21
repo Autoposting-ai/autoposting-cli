@@ -30,14 +30,17 @@ jobs:
             echo "::error::Version mismatch! Tag v$TAG but SDK=$SDK_VER CLI=$CLI_VER"
             exit 1
           fi
-      - run: npx turbo build
-      - run: npx turbo test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npm run pack:smoke
+      - run: npm audit --audit-level=moderate
       - name: Publish SDK
-        run: npm publish --workspace=packages/sdk --access public || true
+        run: npm publish --workspace=packages/sdk --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish CLI
-        run: npm publish --workspace=packages/cli --access public || true
+        run: npm publish --workspace=packages/cli --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Create GitHub Release

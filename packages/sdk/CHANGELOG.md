@@ -1,5 +1,11 @@
 # @autoposting.ai/sdk
 
+## 0.3.0
+
+### Minor Changes
+
+- Harden the v0.3 CLI and MCP release path with stricter platform validation, correct package metadata, packed package smoke checks, and audit/typecheck release gates.
+
 ## 0.2.0
 
 ### Minor Changes

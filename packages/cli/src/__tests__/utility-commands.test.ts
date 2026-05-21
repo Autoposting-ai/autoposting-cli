@@ -10,6 +10,10 @@ import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 
+const CLI_PACKAGE = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8')) as {
+  version: string
+}
+
 const CLI = path.resolve(__dirname, '../../dist/cli.cjs')
 
 let tmpDir: string
@@ -205,6 +209,6 @@ describe('ap --version', () => {
   it('reports the published package version, not a stale placeholder', async () => {
     const result = await ap(['--version'])
     expect(result.exitCode).toBe(0)
-    expect(result.stdout.trim()).toBe('0.2.31')
+    expect(result.stdout.trim()).toBe(CLI_PACKAGE.version)
   })
 })
