@@ -19,5 +19,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
+      - run: npm run typecheck
       - run: npx turbo build
       - run: npx turbo test
+      - run: npm run pack:smoke
+      - run: npm audit --audit-level=moderate

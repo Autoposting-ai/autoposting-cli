@@ -2,12 +2,16 @@
   "name": "autoposting-cli-monorepo",
   "private": true,
   "packageManager": "npm@11.12.1",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "turbo build",
     "test": "turbo test",
+    "test:regression": "npm run typecheck && npm run build && npm test && npm run pack:smoke && npm audit --audit-level=moderate",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "pack:smoke": "node scripts/pack-smoke.mjs",
     "changeset": "changeset"
   },
   "devDependencies": {
@@ -15,7 +19,7 @@
     "eslint": "^9.27.0",
     "prettier": "^3.5.3",
     "tsup": "^8.4.0",
-    "turbo": "^2.5.3",
+    "turbo": "^2.9.14",
     "typescript": "^5.8.3",
     "vitest": "^3.2.1"
   },

@@ -4,7 +4,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { Autoposting } from '@autoposting.ai/sdk'
+import { Autoposting, VERSION } from '@autoposting.ai/sdk'
 import { ALL_TOOLS } from './tools.js'
 import { handleToolCall } from './handler.js'
 
@@ -12,7 +12,7 @@ export async function startMcpServer(): Promise<void> {
   const client = new Autoposting() // reads AUTOPOSTING_API_KEY from env
 
   const server = new Server(
-    { name: 'autoposting-mcp', version: '0.1.0' },
+    { name: 'autoposting-mcp', version: VERSION },
     { capabilities: { tools: {} } },
   )
 
