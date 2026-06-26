@@ -4,7 +4,7 @@ import { resolveAuth } from '../auth/auth-manager.js'
 import { getCredentialsPath } from '../auth/credential-store.js'
 import fs from 'node:fs'
 
-const API_HEALTH_URL = 'https://app.autoposting.ai/api/health'
+const API_HEALTH_URL = 'https://app.autoposting.ai/api-proxy/health'
 
 type CheckResult = {
   name: string
@@ -27,10 +27,10 @@ async function runChecks(): Promise<CheckResult[]> {
     value: nodeVersion,
   })
 
-  // Auth
+  // Auth (local credential presence only — server validation happens in `whoami`)
   try {
     resolveAuth()
-    results.push({ name: 'Auth', status: 'pass', value: 'authenticated' })
+    results.push({ name: 'Auth', status: 'pass', value: 'credentials configured' })
   } catch {
     results.push({ name: 'Auth', status: 'fail', value: 'not configured' })
   }

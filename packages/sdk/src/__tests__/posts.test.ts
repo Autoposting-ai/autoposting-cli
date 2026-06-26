@@ -5,7 +5,7 @@ import { Autoposting } from '../client'
 import type { Post } from '../types/posts'
 import type { PaginatedResponse } from '../types'
 
-const BASE = 'https://app.autoposting.ai'
+const BASE = 'https://app.autoposting.ai/api-proxy'
 
 const server = setupServer()
 
@@ -35,11 +35,11 @@ function makeClient() {
 }
 
 describe('posts.list()', () => {
-  it('sends GET /v1/posts and returns paginated response', async () => {
+  it('sends GET /posts and returns paginated response', async () => {
     const payload = makePaginated([makePost()])
 
     server.use(
-      http.get(`${BASE}/v1/posts`, () => HttpResponse.json(payload)),
+      http.get(`${BASE}/posts`, () => HttpResponse.json(payload)),
     )
 
     const client = makeClient()
@@ -51,7 +51,7 @@ describe('posts.list()', () => {
     let capturedUrl = ''
 
     server.use(
-      http.get(`${BASE}/v1/posts`, ({ request }) => {
+      http.get(`${BASE}/posts`, ({ request }) => {
         capturedUrl = request.url
         return HttpResponse.json(makePaginated([]))
       }),
@@ -67,7 +67,7 @@ describe('posts.list()', () => {
     let capturedUrl = ''
 
     server.use(
-      http.get(`${BASE}/v1/posts`, ({ request }) => {
+      http.get(`${BASE}/posts`, ({ request }) => {
         capturedUrl = request.url
         return HttpResponse.json(makePaginated([]))
       }),
@@ -83,7 +83,7 @@ describe('posts.list()', () => {
     let capturedUrl = ''
 
     server.use(
-      http.get(`${BASE}/v1/posts`, ({ request }) => {
+      http.get(`${BASE}/posts`, ({ request }) => {
         capturedUrl = request.url
         return HttpResponse.json(makePaginated([]))
       }),
@@ -99,11 +99,11 @@ describe('posts.list()', () => {
 })
 
 describe('posts.getById()', () => {
-  it('sends GET /v1/posts/:id and returns a post', async () => {
+  it('sends GET /posts/:id and returns a post', async () => {
     const post = makePost({ id: 'abc-123' })
 
     server.use(
-      http.get(`${BASE}/v1/posts/abc-123`, () => HttpResponse.json(post)),
+      http.get(`${BASE}/posts/abc-123`, () => HttpResponse.json(post)),
     )
 
     const client = makeClient()
@@ -113,12 +113,12 @@ describe('posts.getById()', () => {
 })
 
 describe('posts.create()', () => {
-  it('sends POST /v1/posts with brandSlug, text, and platforms', async () => {
+  it('sends POST /posts with brandSlug, text, and platforms', async () => {
     let capturedBody: unknown = null
     const post = makePost()
 
     server.use(
-      http.post(`${BASE}/v1/posts`, async ({ request }) => {
+      http.post(`${BASE}/posts`, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json(post, { status: 201 })
       }),
@@ -143,7 +143,7 @@ describe('posts.create()', () => {
     let capturedBody: unknown = null
 
     server.use(
-      http.post(`${BASE}/v1/posts`, async ({ request }) => {
+      http.post(`${BASE}/posts`, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json(makePost({ status: 'scheduled', scheduledAt: '2024-06-01T10:00:00Z' }))
       }),
@@ -159,15 +159,36 @@ describe('posts.create()', () => {
 
     expect((capturedBody as { scheduledAt: string }).scheduledAt).toBe('2024-06-01T10:00:00Z')
   })
+
+  it('forwards a thread array when provided', async () => {
+    let capturedBody: unknown = null
+
+    server.use(
+      http.post(`${BASE}/posts`, async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json(makePost(), { status: 201 })
+      }),
+    )
+
+    const client = makeClient()
+    await client.posts.create({
+      brandSlug: 'my-brand',
+      text: 'Hook',
+      platforms: ['x'],
+      thread: ['reply one', 'reply two'],
+    })
+
+    expect((capturedBody as { thread: string[] }).thread).toEqual(['reply one', 'reply two'])
+  })
 })
 
 describe('posts.update()', () => {
-  it('sends PUT /v1/posts/:id with update params', async () => {
+  it('sends PUT /posts/:id with update params', async () => {
     let capturedBody: unknown = null
     const post = makePost({ text: 'Updated text' })
 
     server.use(
-      http.put(`${BASE}/v1/posts/post-1`, async ({ request }) => {
+      http.put(`${BASE}/posts/post-1`, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json(post)
       }),
@@ -182,11 +203,11 @@ describe('posts.update()', () => {
 })
 
 describe('posts.remove()', () => {
-  it('sends DELETE /v1/posts/:id', async () => {
+  it('sends DELETE /posts/:id', async () => {
     let deleteCalled = false
 
     server.use(
-      http.delete(`${BASE}/v1/posts/post-1`, () => {
+      http.delete(`${BASE}/posts/post-1`, () => {
         deleteCalled = true
         return new HttpResponse(null, { status: 204 })
       }),
@@ -199,11 +220,11 @@ describe('posts.remove()', () => {
 })
 
 describe('posts.publish()', () => {
-  it('sends POST /v1/posts/:id/publish', async () => {
+  it('sends POST /posts/:id/publish', async () => {
     const post = makePost({ status: 'published', publishedAt: '2024-01-02T00:00:00Z' })
 
     server.use(
-      http.post(`${BASE}/v1/posts/post-1/publish`, () => HttpResponse.json(post)),
+      http.post(`${BASE}/posts/post-1/publish`, () => HttpResponse.json(post)),
     )
 
     const client = makeClient()
@@ -213,12 +234,12 @@ describe('posts.publish()', () => {
 })
 
 describe('posts.schedule()', () => {
-  it('sends PUT /v1/posts/:id/schedule with scheduledAt in body', async () => {
+  it('sends PUT /posts/:id/schedule with scheduledAt in body', async () => {
     let capturedBody: unknown = null
     const post = makePost({ status: 'scheduled', scheduledAt: '2024-06-01T10:00:00Z' })
 
     server.use(
-      http.put(`${BASE}/v1/posts/post-1/schedule`, async ({ request }) => {
+      http.put(`${BASE}/posts/post-1/schedule`, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json(post)
       }),
@@ -233,12 +254,12 @@ describe('posts.schedule()', () => {
 })
 
 describe('posts.retry()', () => {
-  it('sends POST /v1/posts/:id/retry', async () => {
+  it('sends POST /posts/:id/retry', async () => {
     let retryCalled = false
     const post = makePost()
 
     server.use(
-      http.post(`${BASE}/v1/posts/post-1/retry`, () => {
+      http.post(`${BASE}/posts/post-1/retry`, () => {
         retryCalled = true
         return HttpResponse.json(post)
       }),
@@ -251,11 +272,11 @@ describe('posts.retry()', () => {
 })
 
 describe('posts.rewrite()', () => {
-  it('sends POST /v1/posts/:id/rewrite', async () => {
+  it('sends POST /posts/:id/rewrite', async () => {
     const rewritten = makePost({ text: 'Rewritten text' })
 
     server.use(
-      http.post(`${BASE}/v1/posts/post-1/rewrite`, () => HttpResponse.json(rewritten)),
+      http.post(`${BASE}/posts/post-1/rewrite`, () => HttpResponse.json(rewritten)),
     )
 
     const client = makeClient()
@@ -265,11 +286,11 @@ describe('posts.rewrite()', () => {
 })
 
 describe('posts.score()', () => {
-  it('sends POST /v1/posts/:id/score and returns score + feedback', async () => {
+  it('sends POST /posts/:id/score and returns score + feedback', async () => {
     const scoreResult = { score: 87, feedback: 'Strong hook, clear CTA.' }
 
     server.use(
-      http.post(`${BASE}/v1/posts/post-1/score`, () => HttpResponse.json(scoreResult)),
+      http.post(`${BASE}/posts/post-1/score`, () => HttpResponse.json(scoreResult)),
     )
 
     const client = makeClient()

@@ -21,6 +21,6 @@ export class WorkspacesResource extends Resource {
         ),
       )
     }
-    return this.post<void>('/orgs/set-active', { organizationId: id })
+    return this.client.request<void>('PUT', '/orgs/active', { organizationId: id })
   }
 }

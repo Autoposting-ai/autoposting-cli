@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
 import type { Workspace } from '../types/workspaces'
 
-const BASE = 'https://app.autoposting.ai'
+const BASE = 'https://app.autoposting.ai/api-proxy'
 
 const server = setupServer()
 
@@ -30,10 +30,10 @@ describe('workspaces.list()', () => {
 })
 
 describe('workspaces.switchWorkspace()', () => {
-  it('sends POST /orgs/set-active with organizationId when using session auth', async () => {
+  it('sends PUT /orgs/active with organizationId when using session auth', async () => {
     let capturedBody: unknown = null
     server.use(
-      http.post(`${BASE}/orgs/set-active`, async ({ request }) => {
+      http.put(`${BASE}/orgs/active`, async ({ request }) => {
         capturedBody = await request.json()
         return new HttpResponse(null, { status: 204 })
       }),

@@ -31,7 +31,7 @@ export class ClipsResource extends Resource {
   }
 
   importUrl(params: ImportClipParams): Promise<Clip> {
-    return this.client.request<Clip>('POST', '/clips/import', params)
+    return this.client.request<Clip>('POST', '/clips/import-url', params)
   }
 
   render(id: string): Promise<Clip> {

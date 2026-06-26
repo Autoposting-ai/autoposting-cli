@@ -3,7 +3,7 @@ import type { Idea, GenerateIdeasParams } from '../types/kb'
 
 export class IdeasResource extends Resource {
   generate(params: GenerateIdeasParams = {}): Promise<Idea[]> {
-    return this.post<Idea[]>('/ideas/generate', params)
+    return this.post<Idea[]>('/ideas/generate-topic', params)
   }
 
   list(): Promise<Idea[]> {

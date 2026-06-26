@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
 import type { BillingStatus, CreditBalance } from '../types/billing'
 
-const BASE = 'https://app.autoposting.ai'
+const BASE = 'https://app.autoposting.ai/api-proxy'
 
 const server = setupServer()
 

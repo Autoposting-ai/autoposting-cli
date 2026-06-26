@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
 import type { Clip } from '../types/clips'
 
-const BASE = 'https://app.autoposting.ai'
+const BASE = 'https://app.autoposting.ai/api-proxy'
 
 const server = setupServer()
 
@@ -46,11 +46,11 @@ describe('ClipsResource', () => {
     expect(result).toEqual(clip)
   })
 
-  it('importUrl() sends POST /clips/import with url and name', async () => {
+  it('importUrl() sends POST /clips/import-url with url and name', async () => {
     let capturedBody: unknown = null
     const clip = makeClip({ status: 'processing' })
     server.use(
-      http.post(`${BASE}/clips/import`, async ({ request }) => {
+      http.post(`${BASE}/clips/import-url`, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json(clip, { status: 201 })
       }),

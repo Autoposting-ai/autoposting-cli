@@ -12,8 +12,35 @@ type GlobalOpts = {
   format?: 'table' | 'json'
 }
 
+const VALID_PLATFORMS: readonly Platform[] = ['x', 'linkedin', 'instagram', 'threads', 'youtube']
+
 function parsePlatforms(raw: string): Platform[] {
-  return raw.split(',').map((p) => p.trim() as Platform)
+  const parts = raw.split(',').map((p) => p.trim()).filter(Boolean)
+  if (parts.length === 0) {
+    throw new Error('No platforms provided. Pass a comma-separated list, e.g. --platforms x,linkedin')
+  }
+  const invalid = parts.filter((p) => !VALID_PLATFORMS.includes(p as Platform))
+  if (invalid.length > 0) {
+    throw new Error(
+      `Unsupported platform(s): ${invalid.join(', ')}. Valid platforms: ${VALID_PLATFORMS.join(', ')}`,
+    )
+  }
+  return parts as Platform[]
+}
+
+function parsePositiveInt(value: string, flag: string): number {
+  const n = Number(value)
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`${flag} must be a positive integer (received "${value}").`)
+  }
+  return n
+}
+
+function validateScheduledAt(value: string): string {
+  if (Number.isNaN(Date.parse(value))) {
+    throw new Error(`--at must be a valid ISO 8601 datetime (received "${value}").`)
+  }
+  return value
 }
 
 /**
@@ -48,8 +75,8 @@ export function createPostsCommand(): Command {
         const result = await client.posts.list({
           brandSlug: opts.brand,
           status: opts.status as 'draft' | 'scheduled' | 'published' | 'failed' | undefined,
-          limit: parseInt(opts.limit, 10),
-          page: parseInt(opts.page, 10),
+          limit: parsePositiveInt(opts.limit, '--limit'),
+          page: parsePositiveInt(opts.page, '--page'),
         })
         spinner.stop()
         const rows = result.data.map((p) => ({
@@ -97,9 +124,13 @@ export function createPostsCommand(): Command {
     .requiredOption('--text <text>', 'Post text content')
     .requiredOption('--platforms <list>', 'Comma-separated platforms (e.g. x,linkedin)')
     .option('--at <iso>', 'Schedule date/time (ISO 8601)')
+    .option(
+      '--thread <text...>',
+      'Additional posts appended after --text to form a thread (X/Threads only, max 25)',
+    )
     .action(
       async (
-        opts: { brand: string; text: string; platforms: string; at?: string },
+        opts: { brand: string; text: string; platforms: string; at?: string; thread?: string[] },
         cmd: Command,
       ) => {
         const globals = cmd.optsWithGlobals<GlobalOpts>()
@@ -112,7 +143,8 @@ export function createPostsCommand(): Command {
             brandSlug: opts.brand,
             text: opts.text,
             platforms: parsePlatforms(opts.platforms),
-            ...(opts.at ? { scheduledAt: opts.at } : {}),
+            ...(opts.at ? { scheduledAt: validateScheduledAt(opts.at) } : {}),
+            ...(opts.thread && opts.thread.length > 0 ? { thread: opts.thread } : {}),
           })
           spinner.stop()
           printer.log(post)
@@ -146,7 +178,7 @@ export function createPostsCommand(): Command {
           const post = await client.posts.update(id, {
             ...(opts.text ? { text: opts.text } : {}),
             ...(opts.platforms ? { platforms: parsePlatforms(opts.platforms) } : {}),
-            ...(opts.at ? { scheduledAt: opts.at } : {}),
+            ...(opts.at ? { scheduledAt: validateScheduledAt(opts.at) } : {}),
           })
           spinner.stop()
           printer.log(post)
@@ -217,7 +249,7 @@ export function createPostsCommand(): Command {
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        const post = await client.posts.schedule(id, opts.at)
+        const post = await client.posts.schedule(id, validateScheduledAt(opts.at))
         spinner.stop()
         printer.log(post)
       } catch (err) {

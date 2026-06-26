@@ -26,6 +26,8 @@ export interface CreatePostParams {
   platforms: Platform[]
   scheduledAt?: string
   media?: string[]
+  /** Additional posts appended after `text` to form an X/Threads thread (max 25, x/threads only). */
+  thread?: string[]
 }
 
 export interface UpdatePostParams {

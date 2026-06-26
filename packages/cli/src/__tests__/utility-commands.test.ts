@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { execa } from 'execa'
 import fs from 'node:fs'
+import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
@@ -33,6 +34,22 @@ function ap(args: string[], env: NodeJS.ProcessEnv = baseEnv) {
   return execa('node', [CLI, ...args], { env, reject: false })
 }
 
+// Spins a throwaway local HTTP server so subprocess CLI tests can validate against a
+// controllable API (via AUTOPOSTING_BASE_URL) instead of the real production host.
+async function withMockApi(
+  handler: (req: http.IncomingMessage, res: http.ServerResponse) => void,
+  run: (baseUrl: string) => Promise<void>,
+): Promise<void> {
+  const server = http.createServer(handler)
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
+  const { port } = server.address() as { port: number }
+  try {
+    await run(`http://127.0.0.1:${port}`)
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+}
+
 // ---------------------------------------------------------------------------
 // ap doctor
 // ---------------------------------------------------------------------------
@@ -53,7 +70,7 @@ describe('ap doctor', () => {
     expect(parsed.some((c) => c.name === 'Node.js')).toBe(true)
     const authCheck = parsed.find((c) => c.name === 'Auth')
     expect(authCheck?.status).toBe('pass')
-    expect(authCheck?.value).toBe('authenticated')
+    expect(authCheck?.value).toBe('credentials configured')
   })
 
   it('exits 1 and JSON includes auth fail when no credentials', async () => {
@@ -93,28 +110,74 @@ describe('ap whoami', () => {
     expect(result.stderr).toMatch(/No API key found/)
   })
 
-  it('shows env source when AUTOPOSTING_API_KEY is set', async () => {
+  it('shows env source as unverified (exit 0) when the server is unreachable', async () => {
     const result = await ap(['whoami'], {
       ...baseEnv,
       AUTOPOSTING_API_KEY: 'sk-social-testkey',
+      AUTOPOSTING_BASE_URL: 'http://127.0.0.1:1', // refused → graceful degrade, not a hard fail
     })
     expect(result.exitCode).toBe(0)
     expect(result.stdout).toContain('Source:  env')
     expect(result.stdout).toContain('sk-socia') // masked key prefix
+    expect(result.stdout).toContain('unverified')
   })
 
-  it('--json outputs valid JSON with env source', async () => {
+  it('--json outputs valid:false when the server is unreachable', async () => {
     const result = await ap(['whoami', '--json'], {
       ...baseEnv,
       AUTOPOSTING_API_KEY: 'sk-social-testkey',
+      AUTOPOSTING_BASE_URL: 'http://127.0.0.1:1',
     })
     expect(result.exitCode).toBe(0)
     const parsed = JSON.parse(result.stdout) as {
       source: string
       apiKey: string
+      valid: boolean
     }
     expect(parsed.source).toBe('env')
     expect(parsed.apiKey).toMatch(/^sk-socia\*+$/)
+    expect(parsed.valid).toBe(false)
+  })
+
+  it('validates the key against the server and shows the active workspace', async () => {
+    await withMockApi(
+      (_req, res) => {
+        res.setHeader('content-type', 'application/json')
+        res.end(
+          JSON.stringify([
+            { id: 'org-1', name: 'Acme', slug: 'acme', isActive: true, createdAt: '2024-01-01T00:00:00Z' },
+          ]),
+        )
+      },
+      async (baseUrl) => {
+        const result = await ap(['whoami'], {
+          ...baseEnv,
+          AUTOPOSTING_API_KEY: 'sk-social-testkey',
+          AUTOPOSTING_BASE_URL: baseUrl,
+        })
+        expect(result.exitCode).toBe(0)
+        expect(result.stdout).toContain('Workspace: Acme (acme)')
+        expect(result.stdout).toContain('valid')
+      },
+    )
+  })
+
+  it('exits 2 when the server rejects the key (401)', async () => {
+    await withMockApi(
+      (_req, res) => {
+        res.statusCode = 401
+        res.setHeader('content-type', 'application/json')
+        res.end(JSON.stringify({ error: 'Unauthorized', code: 'UNAUTHORIZED' }))
+      },
+      async (baseUrl) => {
+        const result = await ap(['whoami'], {
+          ...baseEnv,
+          AUTOPOSTING_API_KEY: 'sk-social-badkey',
+          AUTOPOSTING_BASE_URL: baseUrl,
+        })
+        expect(result.exitCode).toBe(2)
+      },
+    )
   })
 })
 

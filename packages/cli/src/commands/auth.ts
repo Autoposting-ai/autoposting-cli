@@ -11,7 +11,8 @@ import {
 import { resolveAuth } from '../auth/auth-manager.js'
 import { requestDeviceCode, pollDeviceCode } from '../auth/device-code-client.js'
 
-const DEFAULT_BASE_URL = 'https://app.autoposting.ai'
+// Backend auth routes (/auth/cli/*) are reached via the frontend /api-proxy rewrite.
+const DEFAULT_BASE_URL = 'https://app.autoposting.ai/api-proxy'
 
 function resolveBaseUrl(globals: { baseUrl?: string }): string {
   return globals.baseUrl ?? process.env.AUTOPOSTING_BASE_URL ?? DEFAULT_BASE_URL

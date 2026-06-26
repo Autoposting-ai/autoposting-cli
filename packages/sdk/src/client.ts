@@ -1,5 +1,5 @@
 import { VERSION } from './version'
-import { createError, RateLimitError } from './errors'
+import { createError, RateLimitError, AutopostingError } from './errors'
 import { AgentsResource } from './resources/agents'
 import { BillingResource } from './resources/billing'
 import { BrandsResource } from './resources/brands'
@@ -51,7 +51,15 @@ export class Autoposting {
       )
     }
     this._apiKey = key
-    this.baseUrl = (config.baseUrl ?? 'https://app.autoposting.ai').replace(/\/$/, '')
+    // Resolution order: explicit config → AUTOPOSTING_BASE_URL env → default.
+    // Production API is served by the backend behind the Next.js frontend's
+    // /api-proxy rewrite (app.autoposting.ai/api-proxy/* -> backend/*). The bare
+    // app.autoposting.ai host serves the dashboard SPA, not the JSON API.
+    this.baseUrl = (
+      config.baseUrl ||
+      process.env.AUTOPOSTING_BASE_URL ||
+      'https://app.autoposting.ai/api-proxy'
+    ).replace(/\/$/, '')
     this.timeout = config.timeout ?? 30_000
     this.extraHeaders = config.headers ?? {}
     this.authSource = config.authSource ?? 'api-key'
@@ -86,13 +94,15 @@ export class Autoposting {
       url = `${url}?${params.toString()}`
     }
 
-    // FormData must not have a content-type header — fetch sets it with the multipart boundary
+    // FormData must not have a content-type header — fetch sets it with the multipart boundary.
     const isFormData = body instanceof FormData
+    // Spread caller headers first so the auth, source, and content-type headers below
+    // always win — a stray `headers` override must never strip authentication.
     const headers: Record<string, string> = {
+      ...this.extraHeaders,
       authorization: `Bearer ${this._apiKey}`,
       'user-agent': `autoposting-sdk/${VERSION}`,
       'x-source': 'sdk',
-      ...this.extraHeaders,
     }
     if (!isFormData) {
       headers['content-type'] = 'application/json'
@@ -101,43 +111,93 @@ export class Autoposting {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), this.timeout)
 
-    let response: Response
+    // Keep the abort timer armed through the body read, not just the fetch — a
+    // response whose body stream stalls would otherwise hang past the timeout.
     try {
-      response = await fetch(url, {
-        method,
-        headers,
-        body: isFormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      })
+      let response: Response
+      try {
+        response = await fetch(url, {
+          method,
+          headers,
+          body: isFormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        })
+      } catch (err) {
+        // fetch rejects on network failure or abort (timeout) — wrap both so callers
+        // always get an AutopostingError, never a raw TypeError / DOMException.
+        if (err instanceof Error && err.name === 'AbortError') {
+          throw new AutopostingError(
+            `Request to ${method} ${path} timed out after ${this.timeout}ms.`,
+            0,
+            'TIMEOUT',
+          )
+        }
+        throw new AutopostingError(
+          `Network request to ${method} ${path} failed: ${err instanceof Error ? err.message : String(err)}`,
+          0,
+          'NETWORK_ERROR',
+        )
+      }
+
+      if (!response.ok) {
+        const raw = await response.text()
+        let errorBody: { error?: string; code?: string } = {}
+        if (raw) {
+          try {
+            errorBody = JSON.parse(raw) as { error?: string; code?: string }
+          } catch {
+            // non-JSON error body (e.g. an HTML page from a wrong base URL or a proxy/5xx)
+          }
+        }
+        if (!errorBody.error) {
+          const snippet = raw.replace(/\s+/g, ' ').trim().slice(0, 120)
+          errorBody.error = snippet
+            ? `HTTP ${response.status} ${response.statusText}: ${snippet}`
+            : `HTTP ${response.status} ${response.statusText}`
+        }
+
+        const err = createError(response.status, errorBody)
+
+        if (err instanceof RateLimitError) {
+          const retryAfter = response.headers.get('Retry-After')
+          if (retryAfter) {
+            // Retry-After is delta-seconds OR an HTTP-date (RFC 7231) — handle both.
+            const seconds = Number(retryAfter)
+            if (Number.isFinite(seconds)) {
+              err.retryAfter = Math.max(0, Math.round(seconds))
+            } else {
+              const dateMs = Date.parse(retryAfter)
+              if (!Number.isNaN(dateMs)) {
+                err.retryAfter = Math.max(0, Math.round((dateMs - Date.now()) / 1000))
+              }
+            }
+          }
+        }
+
+        throw err
+      }
+
+      // 204 No Content — return empty object
+      if (response.status === 204) {
+        return {} as T
+      }
+
+      const text = await response.text()
+      if (!text) return {} as T
+      try {
+        return JSON.parse(text) as T
+      } catch {
+        // A 2xx with a non-JSON body almost always means the base URL points at the
+        // web app (HTML) instead of the JSON API — surface that, not a raw parse error.
+        throw new AutopostingError(
+          `Expected a JSON response from ${method} ${path} but received non-JSON (HTTP ${response.status}). ` +
+            `Verify the API base URL (AUTOPOSTING_BASE_URL / --base-url) points at the API, not the web app.`,
+          response.status,
+          'INVALID_RESPONSE',
+        )
+      }
     } finally {
       clearTimeout(timer)
     }
-
-    if (!response.ok) {
-      let errorBody: { error?: string; code?: string } = {}
-      try {
-        errorBody = (await response.json()) as { error?: string; code?: string }
-      } catch {
-        // non-JSON error body — leave as empty object
-      }
-
-      const err = createError(response.status, errorBody)
-
-      if (err instanceof RateLimitError) {
-        const retryAfter = response.headers.get('Retry-After')
-        if (retryAfter) {
-          err.retryAfter = parseInt(retryAfter, 10)
-        }
-      }
-
-      throw err
-    }
-
-    // 204 No Content — return empty object
-    if (response.status === 204) {
-      return {} as T
-    }
-
-    return response.json() as Promise<T>
   }
 }

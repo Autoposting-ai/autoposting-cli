@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
 import type { Idea } from '../types/kb'
 
-const BASE = 'https://app.autoposting.ai'
+const BASE = 'https://app.autoposting.ai/api-proxy'
 
 const mockIdea: Idea = {
   id: 'idea-1',
@@ -29,7 +29,7 @@ describe('ideas.generate()', () => {
   it('sends POST /ideas/generate with params and returns ideas', async () => {
     let capturedBody: unknown = null
     server.use(
-      http.post(`${BASE}/ideas/generate`, async ({ request }) => {
+      http.post(`${BASE}/ideas/generate-topic`, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json([mockIdea], { status: 201 })
       }),
@@ -42,7 +42,7 @@ describe('ideas.generate()', () => {
   it('sends POST /ideas/generate with empty body when no params provided', async () => {
     let capturedBody: unknown = null
     server.use(
-      http.post(`${BASE}/ideas/generate`, async ({ request }) => {
+      http.post(`${BASE}/ideas/generate-topic`, async ({ request }) => {
         capturedBody = await request.json()
         return HttpResponse.json([mockIdea])
       }),
