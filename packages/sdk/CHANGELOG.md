@@ -1,5 +1,14 @@
 # @autoposting.ai/sdk
 
+## 0.3.3
+
+### Patch Changes
+
+- posts create: media attachments + platform-specific options, and a per-account selector
+  - `posts create` now uploads media and attaches it: `--media <files...>`, `--platform-media <p=path...>`, `--alt-text <text...>`, plus `--platform-text <p=text...>` and per-platform option flags (`--yt-*`, `--ig-*`, `--threads-*`). Unsupported file extensions are rejected before any upload.
+  - Per-account targeting when a brand has multiple connected accounts of the same platform: `--account <p=handle|id...>` (handles are case-insensitive, leading `@` optional). With 2+ accounts and no flag, an interactive picker runs on a real TTY; non-interactive contexts fail fast with the list of valid accounts.
+  - `posts schedule <id> --cancel` unschedules a post (returns it to draft). `--at` is now optional; provide exactly one of `--at` or `--cancel`.
+
 ## 0.3.2
 
 ### Patch Changes

@@ -79,6 +79,17 @@ const post = await client.posts.create({
   scheduledAt: '2025-02-01T14:00:00Z',
 })
 
+// Attach media (upload first, then reference by URL)
+await client.posts.create({
+  brandSlug: 'my-brand',
+  text: 'Ship day 🚀',
+  platforms: ['x'],
+  media: [{ url: 'https://cdn.example/chart.png', type: 'image', altText: 'Q2 chart' }],
+})
+
+// Unschedule a post — returns it to draft
+await client.posts.unschedule(post.id)
+
 // AI-rewrite a post for better engagement
 await client.posts.rewrite(post.id)
 
@@ -181,7 +192,7 @@ const usage = await client.usage.summary()
 
 | Resource | Methods |
 |----------|---------|
-| `client.posts` | `list` · `retrieve` · `create` · `update` · `remove` · `publish` · `schedule` · `retry` · `rewrite` · `score` |
+| `client.posts` | `list` · `getById` · `create` · `update` · `remove` · `publish` · `schedule` · `unschedule` · `retry` · `rewrite` · `score` |
 | `client.brands` | `list` · `retrieve` · `create` · `update` · `remove` · `authStatus` |
 | `client.agents` | `list` · `retrieve` · `create` · `update` · `remove` · `run` · `toggle` · `runs` |
 | `client.kb` | `list` · `retrieve` · `create` · `remove` · `search` · `ingest` · `docs` |

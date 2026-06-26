@@ -69,7 +69,10 @@ ap doctor
 # Posts — create, schedule, publish, AI-rewrite, AI-score
 ap posts create --brand my-brand --text "Launch day!" --platforms x,linkedin,threads
 ap posts create --brand my-brand --text "Tweet 1" --thread "Tweet 2" "Tweet 3" --platforms x   # multi-tweet thread (X/Threads, max 25)
+ap posts create --brand my-brand --text "Ship day 🚀" --platforms x --media chart.png demo.mp4 --alt-text "Q2 chart"   # attach media (alt text aligns by index)
+ap posts create --brand my-brand --text "Update" --platforms linkedin --account linkedin=@acme-corp   # pick one of several accounts on a platform
 ap posts schedule <id> --at "2025-06-01T09:00:00Z"
+ap posts schedule <id> --cancel                # unschedule, back to draft
 ap posts publish <id>
 ap posts rewrite <id>          # AI-rewrite for better engagement
 ap posts score <id>            # AI scoring with feedback

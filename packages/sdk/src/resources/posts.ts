@@ -4,7 +4,7 @@ import type { Post, CreatePostParams, UpdatePostParams, ListPostsParams } from '
 // PostsResource methods `get` and `delete` cannot directly override the base class
 // protected generics (`get<T>`, `delete<T>`) due to TypeScript generic covariance rules.
 // We call `this.client.request` directly and expose public methods with unambiguous names.
-// The public API surface is: list, get, create, update, delete, publish, schedule, retry, rewrite, score.
+// The public API surface is: list, get, create, update, delete, publish, schedule, unschedule, retry, rewrite, score.
 export class PostsResource extends Resource {
   /** GET /posts — backend returns a bare array (no pagination metadata). */
   list(params: ListPostsParams = {}): Promise<Post[]> {
@@ -43,6 +43,11 @@ export class PostsResource extends Resource {
 
   schedule(id: string, scheduledAt: string): Promise<Post> {
     return this.client.request<Post>('PUT', `/posts/${id}/schedule`, { scheduledAt })
+  }
+
+  /** PUT /posts/:id/schedule with { cancel: true } — returns the post to draft. */
+  unschedule(id: string): Promise<Post> {
+    return this.client.request<Post>('PUT', `/posts/${id}/schedule`, { cancel: true })
   }
 
   retry(id: string): Promise<Post> {
