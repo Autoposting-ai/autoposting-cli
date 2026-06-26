@@ -3,7 +3,13 @@
 "@autoposting.ai/cli": patch
 ---
 
-Fix broken endpoint paths, harden the HTTP client and auth flows, and validate command inputs.
+Fix broken endpoint paths, unwrap the API response envelope, harden the HTTP client and auth flows, and validate command inputs.
+
+**SDK response envelope (systemic fix):**
+
+- The backend wraps every success as `{ success: true, data: <payload> }`; the SDK now unwraps it in `client.request()` and returns the inner payload (void deletes → `{}`; non-enveloped bodies pass through). Previously the raw envelope leaked out, so every resource return type was wrong at runtime.
+- All resource return types and CLI/MCP consumers realigned to the real data shapes: bare arrays, `Paginated{ items, total, limit, offset }`, `{ results }`, `{ clips, pagination }` — replacing the fictional `{ data, page, hasMore }` shape.
+- `ideas enrich` now takes `--title/--hook/--angle/--platforms` (the backend enriches an idea object across 1–5 platforms; there is no enrich-by-id route).
 
 **SDK endpoint corrections** (now match the unversioned backend routes):
 
