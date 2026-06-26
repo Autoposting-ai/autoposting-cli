@@ -41,7 +41,7 @@ describe('workspaces.list()', () => {
   it('rejects with actionable guidance when authSource is api-key (no network call)', async () => {
     const client = new Autoposting({ apiKey: 'test-key', authSource: 'api-key' })
     await expect(client.workspaces.list()).rejects.toThrow(/session auth/i)
-    await expect(client.workspaces.list()).rejects.toThrow(/ap login/)
+    await expect(client.workspaces.list()).rejects.toThrow(/single workspace/i)
   })
 })
 
