@@ -15,6 +15,9 @@ export interface PlatformConnection {
   connected: boolean
   // Backend field names (proven against GET /brands/:slug/auth/status).
   platformUsername?: string
+  platformUserId?: string
+  platformAccountType?: 'personal' | 'organization'
+  profileImageUrl?: string
   expiresAt?: string
   refreshError?: string
 }

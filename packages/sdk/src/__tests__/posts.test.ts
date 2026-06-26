@@ -252,6 +252,26 @@ describe('posts.schedule()', () => {
   })
 })
 
+describe('posts.unschedule()', () => {
+  it('sends PUT /posts/:id/schedule with { cancel: true } and returns the draft post', async () => {
+    let capturedBody: unknown = null
+    const post = makePost({ status: 'draft', scheduledAt: undefined })
+
+    server.use(
+      http.put(`${BASE}/posts/post-1/schedule`, async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json(wrap(post))
+      }),
+    )
+
+    const client = makeClient()
+    const result = await client.posts.unschedule('post-1')
+
+    expect(capturedBody).toEqual({ cancel: true })
+    expect(result.status).toBe('draft')
+  })
+})
+
 describe('posts.retry()', () => {
   it('sends POST /posts/:id/retry', async () => {
     let retryCalled = false

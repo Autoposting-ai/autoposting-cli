@@ -87,8 +87,17 @@ Opens your browser, shows a device code, and completes authentication automatica
 # Draft a post
 ap posts create --brand my-brand --text "Hello from the terminal!" --platforms x,linkedin
 
-# Schedule it
+# Attach media (images/video) — alt text aligns to files by index
+ap posts create --brand my-brand --text "Ship day 🚀" --platforms x \
+  --media chart.png demo.mp4 --alt-text "Q2 chart"
+
+# Pick a specific account when a brand has several of one platform
+ap posts create --brand my-brand --text "Update" --platforms linkedin \
+  --account linkedin=@acme-corp
+
+# Schedule it (or --cancel to unschedule back to draft)
 ap posts schedule <post-id> --at "2025-01-15T09:00:00Z"
+ap posts schedule <post-id> --cancel
 
 # Or publish immediately
 ap posts publish <post-id>
@@ -112,11 +121,11 @@ ap brands list    # list all brands in your workspace
 |---------|-------------|
 | `ap posts list` | List posts (filter by brand, status, page) |
 | `ap posts get <id>` | Get a post by ID |
-| `ap posts create` | Create a new post draft |
+| `ap posts create` | Create a draft (supports media, per-platform text/options, account selector) |
 | `ap posts update <id>` | Update text, platforms, or schedule |
 | `ap posts delete <id>` | Delete a post (requires `--force`) |
 | `ap posts publish <id>` | Publish immediately |
-| `ap posts schedule <id>` | Schedule for a specific time |
+| `ap posts schedule <id>` | Schedule for a specific time (`--at`), or `--cancel` to unschedule |
 | `ap posts retry <id>` | Retry a failed post |
 | `ap posts rewrite <id>` | AI-rewrite post text |
 | `ap posts score <id>` | AI-score with feedback |

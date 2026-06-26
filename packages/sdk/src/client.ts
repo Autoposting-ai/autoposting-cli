@@ -1,6 +1,7 @@
 import { VERSION } from './version'
 import type { ApiResponse } from './types'
 import { createError, RateLimitError, AutopostingError } from './errors'
+import { MediaResource } from './resources/media'
 import { AgentsResource } from './resources/agents'
 import { BillingResource } from './resources/billing'
 import { BrandsResource } from './resources/brands'
@@ -56,6 +57,7 @@ export class Autoposting {
   readonly authSource: 'api-key' | 'session'
   readonly maxRetries: number
   private readonly retryBaseMs: number
+  readonly media: MediaResource
   readonly agents: AgentsResource
   readonly billing: BillingResource
   readonly brands: BrandsResource
@@ -90,6 +92,7 @@ export class Autoposting {
     this.authSource = config.authSource ?? 'api-key'
     this.maxRetries = Math.max(0, config.maxRetries ?? 2)
     this.retryBaseMs = Math.max(0, config.retryBaseMs ?? 300)
+    this.media = new MediaResource(this)
     this.agents = new AgentsResource(this)
     this.billing = new BillingResource(this)
     this.brands = new BrandsResource(this)

@@ -1,9 +1,26 @@
 import { Command } from 'commander'
 import { Autoposting, NotFoundError } from '@autoposting.ai/sdk'
 import type { Platform } from '@autoposting.ai/sdk'
+import fs from 'node:fs/promises'
+import nodePath from 'node:path'
 import { resolveAuth } from '../auth/auth-manager.js'
 import { createPrinter } from '../output/printer.js'
+import type { Spinner } from '../output/spinner.js'
 import { exitCodeFromError } from '../output/exit-codes.js'
+import {
+  extToMime,
+  parsePairs,
+  parsePlatformMediaPairs,
+  validateMediaCount,
+  validateMediaPaths,
+  validateMediaExtensions,
+  alignAltText,
+  buildYoutubeOptions,
+  buildInstagramOptions,
+  buildThreadsOptions,
+} from '../lib/media-flags.js'
+import type { MediaInput } from '@autoposting.ai/sdk'
+import { resolveTargetAccounts } from '../lib/account-select.js'
 
 type GlobalOpts = {
   apiKey?: string
@@ -141,28 +158,193 @@ export function createPostsCommand(): Command {
       '--thread <text...>',
       'Additional posts appended after --text to form a thread (X/Threads only, max 25)',
     )
+    // v0.3.3 — media
+    .option('--media <path...>', 'Media file paths to attach (max 10)')
+    .option('--alt-text <text...>', 'Alt text for --media files, aligned by index')
+    .option('--platform-text <pairs...>', 'Per-platform text, e.g. x=Hello linkedin=World')
+    .option('--platform-media <pairs...>', 'Per-platform media, e.g. instagram=photo.jpg x=banner.png')
+    // v0.3.3 — YouTube
+    .option('--yt-title <t>', 'YouTube video title')
+    .option('--yt-description <d>', 'YouTube video description')
+    .option('--yt-tags <list>', 'YouTube tags (comma-separated)')
+    .option('--yt-privacy <v>', 'YouTube privacy status (public|unlisted|private)')
+    .option('--yt-category <id>', 'YouTube category ID')
+    .option('--yt-made-for-kids', 'Mark YouTube video as made for kids')
+    // v0.3.3 — Instagram
+    .option('--ig-reel', 'Post as an Instagram Reel')
+    .option('--ig-share-to-feed', 'Share Reel to feed')
+    .option('--ig-cover-url <url>', 'Reel cover image URL')
+    .option('--ig-thumb-offset-ms <n>', 'Reel thumbnail offset in milliseconds')
+    .option('--ig-collaborators <list>', 'Reel collaborator handles (comma-separated)')
+    // v0.3.3 — Threads
+    .option('--threads-reply-to <id>', 'Threads post ID to reply to')
+    .option('--threads-reply-control <v>', 'Threads reply control (everyone|accounts_you_follow|mentioned_only)')
+    // v0.3.3 — account selector
+    .option('--account <p=handle|id...>', 'Target specific account per platform, e.g. x=@handle')
     .action(
       async (
-        opts: { brand: string; text: string; platforms: string; at?: string; thread?: string[] },
+        opts: {
+          brand: string
+          text: string
+          platforms: string
+          at?: string
+          thread?: string[]
+          // v0.3.3
+          media?: string[]
+          altText?: string[]
+          platformText?: string[]
+          platformMedia?: string[]
+          ytTitle?: string
+          ytDescription?: string
+          ytTags?: string
+          ytPrivacy?: string
+          ytCategory?: string
+          ytMadeForKids?: boolean
+          igReel?: boolean
+          igShareToFeed?: boolean
+          igCoverUrl?: string
+          igThumbOffsetMs?: string
+          igCollaborators?: string
+          threadsReplyTo?: string
+          threadsReplyControl?: string
+          account?: string[]
+        },
         cmd: Command,
       ) => {
         const globals = cmd.optsWithGlobals<GlobalOpts>()
         const printer = createPrinter(globals)
-        const spinner = printer.spinner('Creating post…')
+        // Spinner is started only after the account picker (see below) — ora's
+        // repaint loop fights the interactive prompt and can obscure the selection.
+        let spinner: Spinner | undefined
         try {
           const cred = resolveAuth({ apiKey: globals.apiKey })
           const client = new Autoposting({ apiKey: cred.apiKey })
+
+          // ── Pure validation pass (all synchronous/disk-only) ──────────────
+          // Must run before any network call so errors are clear and fast.
+          const platforms = parsePlatforms(opts.platforms)
+          const scheduledAt = opts.at ? validateScheduledAt(opts.at) : undefined
+
+          if (opts.media && opts.media.length > 0) {
+            validateMediaCount(opts.media)
+            validateMediaPaths(opts.media)
+            validateMediaExtensions(opts.media)
+          }
+
+          const platformTexts =
+            opts.platformText && opts.platformText.length > 0
+              ? parsePairs('--platform-text', opts.platformText)
+              : undefined
+
+          // Parse platform-media pairs up front (validate format + paths before upload).
+          const platformMediaPaths =
+            opts.platformMedia && opts.platformMedia.length > 0
+              ? parsePlatformMediaPairs('--platform-media', opts.platformMedia)
+              : {}
+          for (const paths of Object.values(platformMediaPaths)) {
+            validateMediaPaths(paths)
+            validateMediaExtensions(paths)
+          }
+
+          // Validate alt-text count against media count before any upload.
+          const altTexts = alignAltText(opts.media ?? [], opts.altText ?? [])
+
+          const youtubeOptions = buildYoutubeOptions({
+            ytTitle: opts.ytTitle,
+            ytDescription: opts.ytDescription,
+            ytTags: opts.ytTags,
+            ytPrivacy: opts.ytPrivacy,
+            ytCategory: opts.ytCategory,
+            ytMadeForKids: opts.ytMadeForKids,
+          })
+          const instagramOptions = buildInstagramOptions({
+            igReel: opts.igReel,
+            igShareToFeed: opts.igShareToFeed,
+            igCoverUrl: opts.igCoverUrl,
+            igThumbOffsetMs: opts.igThumbOffsetMs,
+            igCollaborators: opts.igCollaborators,
+          })
+          const threadsOptions = buildThreadsOptions({
+            threadsReplyTo: opts.threadsReplyTo,
+            threadsReplyControl: opts.threadsReplyControl,
+          })
+
+          // ── Network calls ─────────────────────────────────────────────────
+          const targetAccountIds = await resolveTargetAccounts({
+            brandSlug: opts.brand,
+            platforms,
+            accountFlags: opts.account ?? [],
+            client,
+            // Picker reads stdin — gate on a real interactive terminal, not the
+            // output mode (printer.isTty() is true even when stdout/stdin is piped).
+            isTty: Boolean(process.stdin.isTTY),
+          })
+
+          // Picker done — safe to animate the spinner now (covers uploads + create).
+          spinner = printer.spinner('Creating post…')
+
+          // Upload global media.
+          const mediaInputs: MediaInput[] = []
+          for (let i = 0; i < (opts.media ?? []).length; i++) {
+            const filePath = opts.media![i]
+            const data = await fs.readFile(filePath)
+            const filename = nodePath.basename(filePath)
+            const contentType = extToMime(filename)
+            const uploaded = await client.media.upload({
+              data: new Uint8Array(data),
+              filename,
+              contentType,
+            })
+            mediaInputs.push({
+              url: uploaded.url,
+              type: uploaded.type,
+              ...(altTexts[i] ? { altText: altTexts[i] } : {}),
+            })
+          }
+
+          // Upload per-platform media.
+          const platformMediaResult: Partial<Record<Platform, MediaInput[]>> = {}
+          for (const [p, paths] of Object.entries(platformMediaPaths) as [Platform, string[]][]) {
+            const uploads: MediaInput[] = []
+            for (const filePath of paths) {
+              const data = await fs.readFile(filePath)
+              const filename = nodePath.basename(filePath)
+              const contentType = extToMime(filename)
+              const uploaded = await client.media.upload({
+                data: new Uint8Array(data),
+                filename,
+                contentType,
+              })
+              uploads.push({ url: uploaded.url, type: uploaded.type })
+            }
+            platformMediaResult[p] = uploads
+          }
+
           const post = await client.posts.create({
             brandSlug: opts.brand,
             text: opts.text,
-            platforms: parsePlatforms(opts.platforms),
-            ...(opts.at ? { scheduledAt: validateScheduledAt(opts.at) } : {}),
+            platforms,
+            ...(scheduledAt ? { scheduledAt } : {}),
             ...(opts.thread && opts.thread.length > 0 ? { thread: opts.thread } : {}),
+            ...(mediaInputs.length > 0 ? { media: mediaInputs } : {}),
+            ...(Object.keys(platformMediaResult).length > 0
+              ? { platformMedia: platformMediaResult }
+              : {}),
+            ...(platformTexts && Object.keys(platformTexts).length > 0
+              ? { platformTexts }
+              : {}),
+            ...(Object.keys(targetAccountIds).length > 0
+              ? { targetAccountIds }
+              : {}),
+            ...(instagramOptions ? { instagramOptions } : {}),
+            ...(threadsOptions ? { threadsOptions } : {}),
+            ...(youtubeOptions ? { youtubeOptions } : {}),
+            source: 'cli',
           })
           spinner.stop()
           printer.log(post)
         } catch (err) {
-          spinner.fail()
+          spinner?.fail()
           printer.error(err as Error)
           process.exit(resolveExitCode(err))
         }
@@ -256,19 +438,31 @@ export function createPostsCommand(): Command {
       }
     })
 
-  // ap posts schedule <id> --at <iso-datetime>
+  // ap posts schedule <id> (--at <iso-datetime> | --cancel)
   posts
     .command('schedule <id>')
-    .description('Schedule a post for a specific time')
-    .requiredOption('--at <iso>', 'ISO 8601 datetime to schedule the post')
-    .action(async (id: string, opts: { at: string }, cmd: Command) => {
+    .description('Schedule a post for a specific time, or --cancel to unschedule it')
+    .option('--at <iso>', 'ISO 8601 datetime to schedule the post')
+    .option('--cancel', 'Unschedule the post (return it to draft)')
+    .action(async (id: string, opts: { at?: string; cancel?: boolean }, cmd: Command) => {
       const globals = cmd.optsWithGlobals<GlobalOpts>()
       const printer = createPrinter(globals)
-      const spinner = printer.spinner(`Scheduling post "${id}"…`)
+      const spinner = printer.spinner(
+        opts.cancel ? `Unscheduling post "${id}"…` : `Scheduling post "${id}"…`,
+      )
       try {
+        // Exactly one of --at / --cancel — they are opposite operations.
+        if (opts.cancel && opts.at) {
+          throw new Error('Cannot use --at together with --cancel — choose one.')
+        }
+        if (!opts.cancel && !opts.at) {
+          throw new Error('Provide either --at <iso> to schedule, or --cancel to unschedule.')
+        }
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        const post = await client.posts.schedule(id, validateScheduledAt(opts.at))
+        const post = opts.cancel
+          ? await client.posts.unschedule(id)
+          : await client.posts.schedule(id, validateScheduledAt(opts.at!))
         spinner.stop()
         printer.log(post)
       } catch (err) {

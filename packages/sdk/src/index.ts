@@ -1,4 +1,6 @@
 export { Autoposting, type AutopostingConfig, type AuthProfile } from './client'
+export { MediaResource } from './resources/media'
+export type { MediaUpload, UploadedMedia } from './resources/media'
 export { AgentsResource } from './resources/agents'
 export type { Agent, AgentRun, CreateAgentParams, UpdateAgentParams } from './types/agents'
 export { BillingResource } from './resources/billing'
@@ -10,7 +12,17 @@ export type { Carousel, CarouselSlide, CreateCarouselParams, GenerateCarouselPar
 export { ClipsResource } from './resources/clips'
 export type { Clip, ClipStatus, ImportClipParams } from './types/clips'
 export { PostsResource } from './resources/posts'
-export type { Post, CreatePostParams, UpdatePostParams, ListPostsParams, MediaItem } from './types/posts'
+export type {
+  Post,
+  MediaItem,
+  MediaInput,
+  CreatePostParams,
+  UpdatePostParams,
+  ListPostsParams,
+  InstagramOptions,
+  ThreadsOptions,
+  YoutubeOptions,
+} from './types/posts'
 export { KbResource } from './resources/kb'
 export { IdeasResource } from './resources/ideas'
 export { UsageResource } from './resources/usage'
