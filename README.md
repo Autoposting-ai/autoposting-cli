@@ -163,7 +163,7 @@ ap brands list    # list all brands in your workspace
 |---------|-------------|
 | `ap ideas generate` | AI-generate content ideas |
 | `ap ideas list` | List saved ideas |
-| `ap ideas enrich <id>` | Enrich idea with AI context |
+| `ap ideas enrich --title <t> --hook <h> --angle <a> --platforms <list>` | Enrich an idea across platforms (`twitter,linkedin,instagram,youtube,threads`, max 5) |
 | `ap ideas delete <id>` | Delete an idea |
 
 ### Clips

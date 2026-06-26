@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsup'
+import { version } from './package.json'
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -7,4 +8,6 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
+  // Bake the package.json version into the bundle so VERSION never drifts from the release.
+  env: { AUTOPOSTING_SDK_VERSION: version },
 })

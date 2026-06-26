@@ -68,6 +68,7 @@ ap doctor
 ```bash
 # Posts — create, schedule, publish, AI-rewrite, AI-score
 ap posts create --brand my-brand --text "Launch day!" --platforms x,linkedin,threads
+ap posts create --brand my-brand --text "Tweet 1" --thread "Tweet 2" "Tweet 3" --platforms x   # multi-tweet thread (X/Threads, max 25)
 ap posts schedule <id> --at "2025-06-01T09:00:00Z"
 ap posts publish <id>
 ap posts rewrite <id>          # AI-rewrite for better engagement
@@ -79,7 +80,7 @@ ap carousels draft <id>        # convert to post draft
 
 # Ideas — AI-generate content ideas
 ap ideas generate --topic "product launch" --count 10
-ap ideas enrich <id>           # add AI context
+ap ideas enrich --title "..." --hook "..." --angle "..." --platforms twitter,linkedin   # AI-enrich across platforms
 
 # Clips — import and render video
 ap clips import --url "https://youtube.com/watch?v=..."
