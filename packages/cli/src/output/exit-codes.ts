@@ -41,5 +41,9 @@ export function exitCodeFromError(error: unknown): ExitCode {
   if (matchesClass(error, 'RateLimitError')) return EXIT_CODES.RATE_LIMITED
   if (matchesClass(error, 'ValidationError')) return EXIT_CODES.VALIDATION_ERROR
   if (matchesClass(error, 'NetworkError')) return EXIT_CODES.NETWORK_ERROR
+  // SDK transport failures are an AutopostingError carrying a string `code`, not a
+  // dedicated class — match on the code so timeouts/network drops map to exit 7.
+  const code = (error as { code?: unknown } | null)?.code
+  if (code === 'NETWORK_ERROR' || code === 'TIMEOUT') return EXIT_CODES.NETWORK_ERROR
   return EXIT_CODES.GENERAL_ERROR
 }

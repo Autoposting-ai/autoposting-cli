@@ -139,15 +139,12 @@ describe('ap whoami', () => {
     expect(parsed.valid).toBe(false)
   })
 
-  it('validates the key against the server and shows the active workspace', async () => {
+  it('marks the key valid (exit 0) when the server accepts it', async () => {
     await withMockApi(
       (_req, res) => {
+        // whoami validates via /usage/summary; any 200 means the key is accepted. Body ignored.
         res.setHeader('content-type', 'application/json')
-        res.end(
-          JSON.stringify([
-            { id: 'org-1', name: 'Acme', slug: 'acme', isActive: true, createdAt: '2024-01-01T00:00:00Z' },
-          ]),
-        )
+        res.end(JSON.stringify({ success: true, data: {} }))
       },
       async (baseUrl) => {
         const result = await ap(['whoami'], {
@@ -156,8 +153,8 @@ describe('ap whoami', () => {
           AUTOPOSTING_BASE_URL: baseUrl,
         })
         expect(result.exitCode).toBe(0)
-        expect(result.stdout).toContain('Workspace: Acme (acme)')
         expect(result.stdout).toContain('valid')
+        expect(result.stdout).not.toContain('rejected')
       },
     )
   })

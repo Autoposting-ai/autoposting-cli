@@ -196,6 +196,18 @@ export class Autoposting {
           'INVALID_RESPONSE',
         )
       }
+    } catch (err) {
+      // A timer abort during the body read surfaces here as a raw AbortError (the
+      // fetch-phase abort is already wrapped above). Convert it to TIMEOUT so callers
+      // never receive a raw DOMException; already-wrapped AutopostingErrors pass through.
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new AutopostingError(
+          `Request to ${method} ${path} timed out after ${this.timeout}ms.`,
+          0,
+          'TIMEOUT',
+        )
+      }
+      throw err
     } finally {
       clearTimeout(timer)
     }

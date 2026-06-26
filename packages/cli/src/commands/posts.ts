@@ -37,8 +37,12 @@ function parsePositiveInt(value: string, flag: string): number {
 }
 
 function validateScheduledAt(value: string): string {
-  if (Number.isNaN(Date.parse(value))) {
-    throw new Error(`--at must be a valid ISO 8601 datetime (received "${value}").`)
+  // Require a real ISO 8601 datetime. Date.parse alone is lenient (accepts locale formats
+  // like "01/02/2026"), so also require the YYYY-MM-DDTHH:MM prefix the API expects.
+  if (Number.isNaN(Date.parse(value)) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
+    throw new Error(
+      `--at must be a valid ISO 8601 datetime, e.g. 2026-06-30T14:00:00Z (received "${value}").`,
+    )
   }
   return value
 }

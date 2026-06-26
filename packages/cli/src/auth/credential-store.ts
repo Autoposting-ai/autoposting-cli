@@ -44,8 +44,18 @@ export function writeCredentials(creds: CredentialsFile): void {
   // Write to a temp file then rename — an atomic swap on the same filesystem, so a
   // crash or a concurrent writer can never leave a half-written credentials file.
   const tmpPath = `${filePath}.${process.pid}.tmp`
-  fs.writeFileSync(tmpPath, JSON.stringify(creds, null, 2), { encoding: 'utf8', mode: 0o600 })
-  fs.renameSync(tmpPath, filePath)
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(creds, null, 2), { encoding: 'utf8', mode: 0o600 })
+    fs.renameSync(tmpPath, filePath)
+  } catch (err) {
+    // Don't leave a half-written temp file behind on a disk-full / permission failure.
+    try {
+      fs.unlinkSync(tmpPath)
+    } catch {
+      // temp file never created or already gone — nothing to clean up
+    }
+    throw err
+  }
 
   // Ensure 0600 even if file already existed before
   fs.chmodSync(filePath, 0o600)
