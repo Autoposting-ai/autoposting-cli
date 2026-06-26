@@ -1,15 +1,35 @@
 import type { Autoposting, Platform, PlatformConnection } from '@autoposting.ai/sdk'
+import { getDefaultAccount } from '../auth/config-store.js'
 
 // PlatformConnection v0.3.3 already has platformUserId, platformAccountType, profileImageUrl.
 type AccountEntry = PlatformConnection
 
 const VALID_PLATFORMS: readonly Platform[] = ['x', 'linkedin', 'instagram', 'threads', 'youtube']
 
+// Fan-out (=all) larger than this prompts for confirmation on a TTY (M5).
+const FANOUT_CONFIRM_THRESHOLD = 5
+// At/above this many accounts the picker pages instead of dumping the whole list.
+const PAGED_PICKER_THRESHOLD = 8
+
+const isAll = (v: string): boolean => v === 'all' || v === '*'
+
+/**
+ * Whether to interactively confirm a fan-out. Only an explicit `--account p=all`
+ * over the threshold on a real TTY prompts — a saved default is a standing opt-in
+ * and a non-TTY run can't prompt (it proceeds with the count printed).
+ */
+export function needsFanoutConfirm(count: number, isTty: boolean, explicit: boolean): boolean {
+  return isTty && explicit && count > FANOUT_CONFIRM_THRESHOLD
+}
+
 /**
  * Resolves --account p=handle|id flags + interactive picker into targetAccountIds.
  *
- * Logic per targeted platform:
- *  - --account specified → resolve handle/id → push platformUserId (unknown → throw)
+ * Logic per targeted platform (an explicit --account flag wins, else a saved
+ * default for this brand+platform, else the picker/throw):
+ *  - value is `all`/`*` → fan out to every connected account (print count; an
+ *    explicit fan-out over the threshold confirms on a TTY)
+ *  - value is a handle/id → resolve → push platformUserId (unknown → throw)
  *  - ≥2 connected accounts, TTY → checkbox multiselect via @inquirer/prompts
  *  - ≥2 connected accounts, non-TTY → throw with list + usage hint
  *  - 0 or 1 account → omit platform (backend defaults to all connected)
@@ -20,12 +40,16 @@ export async function resolveTargetAccounts({
   accountFlags,
   client,
   isTty,
+  emit = (m) => process.stderr.write(`${m}\n`),
 }: {
   brandSlug: string
   platforms: Platform[]
   accountFlags: string[]
   client: Autoposting
   isTty: boolean
+  // Human-facing hints (fan-out count, etc.) — stderr by default so stdout stays
+  // clean for JSON consumers; printed in every mode, including non-TTY.
+  emit?: (message: string) => void
 }): Promise<Partial<Record<Platform, string[]>>> {
   // Validate flag format BEFORE any network call (fast fail on bad input).
   const accountMap: Partial<Record<Platform, string>> = {}
@@ -64,9 +88,30 @@ export async function resolveTargetAccounts({
 
   for (const platform of platforms) {
     const accounts = byPlatform[platform] ?? []
-    const specifiedValue = accountMap[platform]
+    // An explicit --account flag wins; otherwise fall back to a saved default.
+    const flagValue = accountMap[platform]
+    const explicit = flagValue !== undefined
+    const specifiedValue = flagValue ?? getDefaultAccount(brandSlug, platform) ?? undefined
 
-    if (specifiedValue !== undefined) {
+    if (specifiedValue !== undefined && isAll(specifiedValue)) {
+      // Fan out to every connected account for this platform.
+      const ids = accounts
+        .map((a) => a.platformUserId)
+        .filter((id): id is string => Boolean(id))
+      emit(`${platform}: posting to all ${ids.length} connected account(s).`)
+      if (needsFanoutConfirm(ids.length, isTty, explicit)) {
+        // ponytail: lazy import keeps @inquirer/prompts out of non-TTY/test paths
+        const { confirm } = await import('@inquirer/prompts')
+        const ok = await confirm({
+          message: `Post to all ${ids.length} ${platform} accounts?`,
+          default: false,
+        })
+        if (!ok) {
+          throw Object.assign(new Error('Aborted: fan-out not confirmed.'), { exitCode: 1 })
+        }
+      }
+      if (ids.length > 0) result[platform] = ids
+    } else if (specifiedValue !== undefined) {
       // Resolve handle (strip leading @, case-insensitive) or platformUserId.
       const normalized = specifiedValue.startsWith('@') ? specifiedValue.slice(1) : specifiedValue
       const match = accounts.find(
@@ -99,6 +144,11 @@ export async function resolveTargetAccounts({
         const selected: string[] = await checkbox({
           message: `Multiple ${platform} accounts connected — select which to post to:`,
           choices,
+          // ponytail: paged scroll for long lists (23 LinkedIn orgs). @inquirer's
+          // checkbox has no type-to-filter; if many-account users need it, swap in
+          // a search-capable multiselect dep — or save a default to skip the picker.
+          pageSize: accounts.length >= PAGED_PICKER_THRESHOLD ? 12 : 7,
+          loop: false,
         })
         const valid = selected.filter(Boolean)
         if (valid.length > 0) result[platform] = valid

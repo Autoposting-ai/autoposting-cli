@@ -177,7 +177,9 @@ describe('ap posts spinner fail-state (#37)', () => {
     })
     const out = result.stdout + result.stderr
     expect(result.exitCode).not.toBe(0)
-    expect(out).toMatch(/Error:/)
+    // Piped (non-TTY) child → auto mode emits the error as JSON {"error":…};
+    // a TTY would print "Error: …". Match either — the point is the failure surfaces.
+    expect(out).toMatch(/error/i)
     expect(out).not.toMatch(/[✔✓]/) // no success marker on a failed command
   })
 })

@@ -4,6 +4,12 @@ import type { PlatformConnection } from '@autoposting.ai/sdk'
 import { resolveAuth } from '../auth/auth-manager.js'
 import { createPrinter } from '../output/printer.js'
 import { exitCodeFromError } from '../output/exit-codes.js'
+import { parsePairs } from '../lib/media-flags.js'
+import {
+  getDefaultAccounts,
+  setDefaultAccount,
+  clearDefaultAccounts,
+} from '../auth/config-store.js'
 
 /**
  * Classify a platform connection's token. A connection is only "ok" when it's
@@ -212,6 +218,44 @@ export function createBrandsCommand(): Command {
         printer.error(err as Error)
         process.exit(exitCodeFromError(err))
       }
+    })
+
+  // ap brands set-default-account <slug> <p=handle|id|all...>
+  // Local-only: saves the account to target per platform when --account is omitted.
+  brands
+    .command('set-default-account <slug> <pairs...>')
+    .description('Save default target account(s) for a brand, e.g. x=@handle linkedin=all')
+    .action((slug: string, pairs: string[], _opts: Record<string, unknown>, cmd: Command) => {
+      const printer = createPrinter(cmd.optsWithGlobals())
+      try {
+        const parsed = parsePairs('--account', pairs)
+        for (const [platform, value] of Object.entries(parsed)) {
+          setDefaultAccount(slug, platform as keyof typeof parsed, value as string)
+        }
+        printer.log(getDefaultAccounts(slug))
+      } catch (err) {
+        printer.error(err as Error)
+        process.exit(1)
+      }
+    })
+
+  // ap brands get-default-account <slug>
+  brands
+    .command('get-default-account <slug>')
+    .description('Show saved default account(s) for a brand')
+    .action((slug: string, _opts: Record<string, unknown>, cmd: Command) => {
+      const printer = createPrinter(cmd.optsWithGlobals())
+      printer.log(getDefaultAccounts(slug))
+    })
+
+  // ap brands clear-default-account <slug>
+  brands
+    .command('clear-default-account <slug>')
+    .description('Remove all saved default accounts for a brand')
+    .action((slug: string, _opts: Record<string, unknown>, cmd: Command) => {
+      const printer = createPrinter(cmd.optsWithGlobals())
+      clearDefaultAccounts(slug)
+      printer.log(getDefaultAccounts(slug))
     })
 
   return brands

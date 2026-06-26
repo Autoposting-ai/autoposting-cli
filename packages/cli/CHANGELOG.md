@@ -1,5 +1,17 @@
 # autoposting-cli
 
+## 0.3.4
+
+### Patch Changes
+
+- CLI v0.3.4 — output ergonomics, fan-out safety, brand context, dry-run, and bulk create.
+  - **Auto output mode**: default output adapts to the destination — a human-readable table on an interactive terminal, JSON when piped or non-interactive — so scripts get machine output without a flag. `--format table`, `--json`, and `--quiet` still force a mode. Added a built-in `--jq <expr>` filter (zero-dependency minimal subset) for shaping JSON without piping to `jq`.
+  - **Fan-out & saved targets**: `--account <p>=all` (or `=*`) targets every connected account of a platform and always prints the resolved account count; an explicit large fan-out asks for confirmation on a TTY. Save per-brand defaults with `ap brands set-default-account <slug> <p=handle|all...>` (plus `get-default-account`/`clear-default-account`), applied when `--account` is omitted. The multi-account picker pages for long lists.
+  - **Brand context**: `ap config set-context --brand <slug>` (plus `get-context`/`unset-context`) stores a default brand so `--brand` can be omitted on `posts` commands.
+  - **Dry run**: `posts create --dry-run` (alias `--preview`) prints the resolved request body without uploading media or creating the post; fail-fast validation still runs.
+  - **Bulk create**: `posts create --from <file>` creates one post per row from a JSON array or a CSV. Each row is independent — a per-record summary is printed and the command exits non-zero if any row failed.
+  - @autoposting.ai/sdk@0.3.4
+
 ## 0.3.3
 
 ### Patch Changes
