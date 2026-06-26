@@ -36,14 +36,16 @@ export function createBillingCommand(): Command {
         printer.table(
           [
             {
-              plan: status.plan,
-              status: status.status,
-              'trial ends': status.trialEndsAt ?? '—',
-              'renewal date': status.renewalDate ?? '—',
-              'cancels at': status.cancelAt ?? '—',
+              plan: status.planName,
+              status: status.status ?? '—',
+              cycle: status.billingCycle ?? '—',
+              accounts: `${status.accountsUsed}/${status.accountLimit === -1 ? '∞' : status.accountLimit}`,
+              credits: status.creditBalance,
+              renews: status.currentPeriodEnd ?? '—',
+              'trial ends': status.trialEnd ?? '—',
             },
           ],
-          ['plan', 'status', 'trial ends', 'renewal date', 'cancels at'],
+          ['plan', 'status', 'cycle', 'accounts', 'credits', 'renews', 'trial ends'],
         )
       } catch (err) {
         spinner.stop()
@@ -68,19 +70,20 @@ export function createBillingCommand(): Command {
         printer.table(
           [
             {
-              total: credits.total,
-              used: credits.used,
-              remaining: credits.remaining,
+              balance: credits.balanceFormatted,
+              'spent (30d)': credits.totalSpent30d,
             },
           ],
-          ['total', 'used', 'remaining'],
+          ['balance', 'spent (30d)'],
         )
-        if (credits.breakdown && Object.keys(credits.breakdown).length > 0) {
-          const breakdownRows = Object.entries(credits.breakdown).map(([key, val]) => ({
-            category: key,
-            credits: val,
+        if (credits.recentUsage.length > 0) {
+          const usageRows = credits.recentUsage.map((e) => ({
+            date: e.date,
+            description: e.description,
+            amount: e.amount,
+            type: e.type,
           }))
-          printer.table(breakdownRows, ['category', 'credits'])
+          printer.table(usageRows, ['date', 'description', 'amount', 'type'])
         }
       } catch (err) {
         spinner.stop()

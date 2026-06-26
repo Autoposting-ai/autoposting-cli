@@ -1,4 +1,5 @@
 import { VERSION } from './version'
+import type { ApiResponse } from './types'
 import { createError, RateLimitError, AutopostingError } from './errors'
 import { AgentsResource } from './resources/agents'
 import { BillingResource } from './resources/billing'
@@ -184,8 +185,9 @@ export class Autoposting {
 
       const text = await response.text()
       if (!text) return {} as T
+      let parsed: unknown
       try {
-        return JSON.parse(text) as T
+        parsed = JSON.parse(text)
       } catch {
         // A 2xx with a non-JSON body almost always means the base URL points at the
         // web app (HTML) instead of the JSON API — surface that, not a raw parse error.
@@ -196,6 +198,17 @@ export class Autoposting {
           'INVALID_RESPONSE',
         )
       }
+      // The backend wraps every success response as `{ success: true, data: <payload> }`.
+      // Unwrap to the payload so resource return types describe the real data, not the
+      // envelope. Void endpoints (e.g. some deletes) return `{ success: true }` with no
+      // `data` — yield `{}` for those. A body without `success` passes through unchanged.
+      // ponytail: relies on no real payload carrying its own top-level `success` field —
+      // true for this API; revisit if an endpoint returns raw `{ success, ... }` data.
+      if (typeof parsed === 'object' && parsed !== null && (parsed as ApiResponse).success === true) {
+        const env = parsed as ApiResponse<T>
+        return env.data !== undefined ? env.data : ({} as T)
+      }
+      return parsed as T
     } catch (err) {
       // A timer abort during the body read surfaces here as a raw AbortError (the
       // fetch-phase abort is already wrapped above). Convert it to TIMEOUT so callers

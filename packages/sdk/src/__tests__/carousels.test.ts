@@ -26,14 +26,20 @@ function makeCarousel(overrides: Partial<Carousel> = {}): Carousel {
   }
 }
 
+// Every backend success response is wrapped as { success: true, data: <payload> }.
+// The SDK unwraps it, so mocks must wrap and assertions check the unwrapped payload.
+function wrap<T>(data: T) {
+  return { success: true, data }
+}
+
 function makeClient() {
   return new Autoposting({ apiKey: 'test-key' })
 }
 
 describe('carousels.list()', () => {
-  it('sends GET /carousels and returns array', async () => {
-    const payload = [makeCarousel()]
-    server.use(http.get(`${BASE}/carousels`, () => HttpResponse.json(payload)))
+  it('sends GET /carousels and returns the paginated payload (envelope unwrapped)', async () => {
+    const payload = { items: [makeCarousel()], total: 1, limit: 100, offset: 0 }
+    server.use(http.get(`${BASE}/carousels`, () => HttpResponse.json(wrap(payload))))
     const result = await makeClient().carousels.list()
     expect(result).toEqual(payload)
   })
@@ -42,7 +48,7 @@ describe('carousels.list()', () => {
 describe('carousels.retrieve()', () => {
   it('sends GET /carousels/:id and returns carousel', async () => {
     const carousel = makeCarousel({ id: 'abc-123' })
-    server.use(http.get(`${BASE}/carousels/abc-123`, () => HttpResponse.json(carousel)))
+    server.use(http.get(`${BASE}/carousels/abc-123`, () => HttpResponse.json(wrap(carousel))))
     const result = await makeClient().carousels.retrieve('abc-123')
     expect(result).toEqual(carousel)
   })
@@ -55,7 +61,7 @@ describe('carousels.create()', () => {
     server.use(
       http.post(`${BASE}/carousels`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(carousel, { status: 201 })
+        return HttpResponse.json(wrap(carousel), { status: 201 })
       }),
     )
     const result = await makeClient().carousels.create({ title: 'My Carousel' })
@@ -65,7 +71,9 @@ describe('carousels.create()', () => {
 
   it('sends POST /carousels without params', async () => {
     const carousel = makeCarousel({ title: undefined })
-    server.use(http.post(`${BASE}/carousels`, () => HttpResponse.json(carousel, { status: 201 })))
+    server.use(
+      http.post(`${BASE}/carousels`, () => HttpResponse.json(wrap(carousel), { status: 201 })),
+    )
     const result = await makeClient().carousels.create()
     expect(result.id).toBe('carousel-1')
   })
@@ -78,7 +86,7 @@ describe('carousels.generate()', () => {
     server.use(
       http.post(`${BASE}/carousels/generate`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(carousel)
+        return HttpResponse.json(wrap(carousel))
       }),
     )
     const result = await makeClient().carousels.generate({
@@ -92,13 +100,13 @@ describe('carousels.generate()', () => {
 })
 
 describe('carousels.draft()', () => {
-  it('sends POST /carousels/:id/draft', async () => {
+  it('sends POST /carousels/:id/create-draft', async () => {
     let draftCalled = false
     const carousel = makeCarousel({ status: 'ready' })
     server.use(
-      http.post(`${BASE}/carousels/carousel-1/draft`, () => {
+      http.post(`${BASE}/carousels/carousel-1/create-draft`, () => {
         draftCalled = true
-        return HttpResponse.json(carousel)
+        return HttpResponse.json(wrap(carousel))
       }),
     )
     await makeClient().carousels.draft('carousel-1')
@@ -112,7 +120,7 @@ describe('carousels.remove()', () => {
     server.use(
       http.delete(`${BASE}/carousels/carousel-1`, () => {
         deleteCalled = true
-        return new HttpResponse(null, { status: 204 })
+        return HttpResponse.json(wrap({ deleted: true }))
       }),
     )
     await makeClient().carousels.remove('carousel-1')

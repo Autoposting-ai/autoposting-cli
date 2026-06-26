@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
+import { AutopostingError } from '../errors'
 import type { Clip } from '../types/clips'
 
 const BASE = 'https://app.autoposting.ai/api-proxy'
@@ -25,34 +26,44 @@ function makeClip(overrides: Partial<Clip> = {}): Clip {
   }
 }
 
+// Every backend success response is wrapped as { success: true, data: <payload> }.
+// The SDK unwraps it, so mocks must wrap and assertions check the unwrapped payload.
+function wrap<T>(data: T) {
+  return { success: true, data }
+}
+
 function makeClient() {
   return new Autoposting({ apiKey: 'test-key' })
 }
 
 describe('ClipsResource', () => {
-  it('list() sends GET /clips and returns array', async () => {
-    const payload = [makeClip(), makeClip({ id: 'clip-2', name: 'other.mp4' })]
-    server.use(http.get(`${BASE}/clips`, () => HttpResponse.json(payload)))
+  it('list() sends GET /clips and returns { clips, pagination } (envelope unwrapped)', async () => {
+    const payload = {
+      clips: [makeClip(), makeClip({ id: 'clip-2', name: 'other.mp4' })],
+      pagination: { page: 1, limit: 20, total: 2, totalPages: 1 },
+    }
+    server.use(http.get(`${BASE}/clips`, () => HttpResponse.json(wrap(payload))))
 
     const result = await makeClient().clips.list()
     expect(result).toEqual(payload)
+    expect(result.clips).toHaveLength(2)
+    expect(result.pagination.totalPages).toBe(1)
   })
 
-  it('retrieve() sends GET /clips/:id', async () => {
+  it('retrieve() sends GET /clips/:id and returns the unwrapped clip', async () => {
     const clip = makeClip()
-    server.use(http.get(`${BASE}/clips/clip-1`, () => HttpResponse.json(clip)))
+    server.use(http.get(`${BASE}/clips/clip-1`, () => HttpResponse.json(wrap(clip))))
 
     const result = await makeClient().clips.retrieve('clip-1')
     expect(result).toEqual(clip)
   })
 
-  it('importUrl() sends POST /clips/import-url with url and name', async () => {
+  it('importUrl() sends POST /clips/import-url and returns { clipId }', async () => {
     let capturedBody: unknown = null
-    const clip = makeClip({ status: 'processing' })
     server.use(
       http.post(`${BASE}/clips/import-url`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(clip, { status: 201 })
+        return HttpResponse.json(wrap({ clipId: 'clip-1' }), { status: 201 })
       }),
     )
 
@@ -61,26 +72,25 @@ describe('ClipsResource', () => {
       name: 'my-clip',
     })
     expect(capturedBody).toEqual({ url: 'https://example.com/video.mp4', name: 'my-clip' })
-    expect(result).toEqual(clip)
+    expect(result).toEqual({ clipId: 'clip-1' })
   })
 
-  it('render() sends POST /clips/:id/render', async () => {
-    const clip = makeClip({ status: 'rendering' })
+  it('render() sends POST /clips/:id/render and returns job ids', async () => {
+    const payload = { jobIds: ['job-1'], activeJobIds: ['job-1'], reusedJobIds: [] as string[] }
     server.use(
-      http.post(`${BASE}/clips/clip-1/render`, () => HttpResponse.json(clip)),
+      http.post(`${BASE}/clips/clip-1/render`, () => HttpResponse.json(wrap(payload))),
     )
 
     const result = await makeClient().clips.render('clip-1')
-    expect(result).toEqual(clip)
-    expect(result.status).toBe('rendering')
+    expect(result).toEqual(payload)
   })
 
-  it('remove() sends DELETE /clips/:id and resolves on 204', async () => {
+  it('remove() sends DELETE /clips/:id and resolves', async () => {
     let deleteCalled = false
     server.use(
       http.delete(`${BASE}/clips/clip-1`, () => {
         deleteCalled = true
-        return new HttpResponse(null, { status: 204 })
+        return HttpResponse.json(wrap({ deleted: true }))
       }),
     )
 
@@ -88,33 +98,11 @@ describe('ClipsResource', () => {
     expect(deleteCalled).toBe(true)
   })
 
-  it('upload() sends POST /clips/upload as multipart/form-data', async () => {
-    // upload() reads an actual file — we mock the endpoint and verify the request
-    // has no explicit content-type header (fetch sets it with boundary for FormData)
-    let contentType: string | null = null
-    const clip = makeClip({ status: 'uploading' })
-
-    server.use(
-      http.post(`${BASE}/clips/upload`, ({ request }) => {
-        contentType = request.headers.get('content-type')
-        return HttpResponse.json(clip, { status: 201 })
-      }),
-    )
-
-    // Create a temporary file via the node:fs module
-    const { writeFileSync, unlinkSync } = await import('node:fs')
-    const { join } = await import('node:path')
-    const { tmpdir } = await import('node:os')
-    const tmpFile = join(tmpdir(), 'test-upload.mp4')
-    writeFileSync(tmpFile, Buffer.from('fake video data'))
-
-    try {
-      const result = await makeClient().clips.upload(tmpFile, { name: 'test-upload.mp4' })
-      expect(result).toEqual(clip)
-      // fetch sets multipart/form-data boundary automatically — content-type must contain it
-      expect(contentType).toMatch(/multipart\/form-data/)
-    } finally {
-      unlinkSync(tmpFile)
-    }
+  it('upload() throws NOT_IMPLEMENTED — direct file upload is not supported by the API', async () => {
+    await expect(makeClient().clips.upload('/tmp/whatever.mp4')).rejects.toThrow(AutopostingError)
+    await expect(makeClient().clips.upload('/tmp/whatever.mp4')).rejects.toMatchObject({
+      code: 'NOT_IMPLEMENTED',
+      status: 0,
+    })
   })
 })

@@ -12,20 +12,27 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
-const mockWorkspaces: Workspace[] = [
-  { id: 'org-1', name: 'Acme Corp', slug: 'acme', isActive: true, createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'org-2', name: 'Side Project', slug: 'side', isActive: false, createdAt: '2024-02-01T00:00:00Z' },
+// Every backend success response is wrapped as { success: true, data: <payload> }.
+function wrap<T>(data: T) {
+  return { success: true, data }
+}
+
+const organizations: Workspace[] = [
+  { id: 'org-1', name: 'Acme Corp', slug: 'acme', createdAt: '2024-01-01T00:00:00Z' },
+  { id: 'org-2', name: 'Side Project', slug: 'side', createdAt: '2024-02-01T00:00:00Z' },
 ]
 
 describe('workspaces.list()', () => {
-  it('sends GET /orgs and returns workspace list', async () => {
+  it('sends GET /orgs and returns { organizations, activeOrgId } (envelope unwrapped)', async () => {
     server.use(
-      http.get(`${BASE}/orgs`, () => HttpResponse.json(mockWorkspaces)),
+      http.get(`${BASE}/orgs`, () =>
+        HttpResponse.json(wrap({ organizations, activeOrgId: 'org-1' })),
+      ),
     )
     const client = new Autoposting({ apiKey: 'test-key' })
     const result = await client.workspaces.list()
-    expect(result).toEqual(mockWorkspaces)
-    expect(result).toHaveLength(2)
+    expect(result.organizations).toHaveLength(2)
+    expect(result.activeOrgId).toBe('org-1')
   })
 })
 
@@ -35,7 +42,7 @@ describe('workspaces.switchWorkspace()', () => {
     server.use(
       http.put(`${BASE}/orgs/active`, async ({ request }) => {
         capturedBody = await request.json()
-        return new HttpResponse(null, { status: 204 })
+        return HttpResponse.json(wrap({ id: 'org-2', name: 'Side Project', slug: 'side' }))
       }),
     )
     // authSource: 'session' bypasses the API key guard

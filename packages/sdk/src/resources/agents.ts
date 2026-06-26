@@ -1,9 +1,11 @@
 import { Resource } from '../resource'
+import type { Paginated } from '../types'
 import type { Agent, AgentRun, CreateAgentParams, UpdateAgentParams } from '../types/agents'
 
 export class AgentsResource extends Resource {
-  list(): Promise<Agent[]> {
-    return this.get<Agent[]>('/agents')
+  /** GET /agents — backend returns `{ items, total, limit, offset }`. */
+  list(): Promise<Paginated<Agent>> {
+    return this.get<Paginated<Agent>>('/agents')
   }
 
   retrieve(id: string): Promise<Agent> {
@@ -22,15 +24,17 @@ export class AgentsResource extends Resource {
     return this.delete<void>(`/agents/${id}`)
   }
 
-  run(id: string): Promise<AgentRun> {
-    return this.post<AgentRun>(`/agents/${id}/run`)
+  /** POST /agents/:id/run — queues a run; returns `{ runId, status }`, not a full AgentRun. */
+  run(id: string): Promise<{ runId: string; status: string }> {
+    return this.post<{ runId: string; status: string }>(`/agents/${id}/run`)
   }
 
   toggle(id: string): Promise<Agent> {
     return this.post<Agent>(`/agents/${id}/toggle`)
   }
 
-  runs(id: string): Promise<AgentRun[]> {
-    return this.get<AgentRun[]>(`/agents/${id}/runs`)
+  /** GET /agents/:id/runs — backend returns `{ items, total, limit, offset }`. */
+  runs(id: string): Promise<Paginated<AgentRun>> {
+    return this.get<Paginated<AgentRun>>(`/agents/${id}/runs`)
   }
 }

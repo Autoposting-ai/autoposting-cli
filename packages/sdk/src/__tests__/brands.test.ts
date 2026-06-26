@@ -30,10 +30,16 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
+// Every backend success response is wrapped as { success: true, data: <payload> }.
+// The SDK unwraps it, so mocks must wrap and assertions check the unwrapped payload.
+function wrap<T>(data: T) {
+  return { success: true, data }
+}
+
 describe('BrandsResource', () => {
-  it('list() sends GET /brands', async () => {
+  it('list() sends GET /brands and returns the bare array (envelope unwrapped)', async () => {
     server.use(
-      http.get(`${BASE}/brands`, () => HttpResponse.json([mockBrand])),
+      http.get(`${BASE}/brands`, () => HttpResponse.json(wrap([mockBrand]))),
     )
     const client = new Autoposting({ apiKey: 'test-key' })
     const result = await client.brands.list()
@@ -42,7 +48,7 @@ describe('BrandsResource', () => {
 
   it('retrieve() sends GET /brands/:slug', async () => {
     server.use(
-      http.get(`${BASE}/brands/my-brand`, () => HttpResponse.json(mockBrand)),
+      http.get(`${BASE}/brands/my-brand`, () => HttpResponse.json(wrap(mockBrand))),
     )
     const client = new Autoposting({ apiKey: 'test-key' })
     const result = await client.brands.retrieve('my-brand')
@@ -54,7 +60,7 @@ describe('BrandsResource', () => {
     server.use(
       http.post(`${BASE}/brands`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(mockBrand, { status: 201 })
+        return HttpResponse.json(wrap(mockBrand), { status: 201 })
       }),
     )
     const client = new Autoposting({ apiKey: 'test-key' })
@@ -68,7 +74,7 @@ describe('BrandsResource', () => {
     server.use(
       http.patch(`${BASE}/brands/my-brand`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json({ ...mockBrand, name: 'Updated' })
+        return HttpResponse.json(wrap({ ...mockBrand, name: 'Updated' }))
       }),
     )
     const client = new Autoposting({ apiKey: 'test-key' })
@@ -82,7 +88,7 @@ describe('BrandsResource', () => {
     server.use(
       http.delete(`${BASE}/brands/my-brand`, () => {
         deleteCalled = true
-        return new HttpResponse(null, { status: 204 })
+        return HttpResponse.json(wrap({ deleted: true }))
       }),
     )
     const client = new Autoposting({ apiKey: 'test-key' })
@@ -93,7 +99,7 @@ describe('BrandsResource', () => {
   it('authStatus() sends GET /brands/:slug/auth/status', async () => {
     server.use(
       http.get(`${BASE}/brands/my-brand/auth/status`, () =>
-        HttpResponse.json(mockConnections),
+        HttpResponse.json(wrap(mockConnections)),
       ),
     )
     const client = new Autoposting({ apiKey: 'test-key' })

@@ -83,7 +83,7 @@ export function createPostsCommand(): Command {
           page: parsePositiveInt(opts.page, '--page'),
         })
         spinner.stop()
-        const rows = result.data.map((p) => ({
+        const rows = result.map((p) => ({
           id: p.id,
           brand: p.brandSlug,
           status: p.status,

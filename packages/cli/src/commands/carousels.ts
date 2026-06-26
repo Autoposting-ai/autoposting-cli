@@ -33,7 +33,7 @@ export function createCarouselsCommand(): Command {
         const client = new Autoposting({ apiKey: cred.apiKey })
         const list = await client.carousels.list()
         spinner.stop()
-        const rows = list.map((c) => ({
+        const rows = list.items.map((c) => ({
           id: c.id,
           title: c.title ?? '—',
           slides: c.slides.length,

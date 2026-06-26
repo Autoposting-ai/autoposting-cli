@@ -33,18 +33,25 @@ export function createUsageCommand(): Command {
         const client = new Autoposting({ apiKey: cred.apiKey })
         const summary = await client.usage.summary()
         spinner.stop()
-        const rows = Object.entries(summary.platforms).map(([platform, stats]) => ({
-          platform,
-          posts: stats.posts,
-          published: stats.published,
-          failed: stats.failed,
+        printer.log(`Period: ${summary.range.from.slice(0, 10)} → ${summary.range.to.slice(0, 10)}`)
+        printer.table(
+          [
+            {
+              posts: summary.posts.total,
+              published: summary.posts.published,
+              agents: summary.agents.total,
+              'active agents': summary.agents.active,
+              'ai cost (usd)': summary.ai.totalCostUsd,
+              'ai requests': summary.ai.requests,
+            },
+          ],
+          ['posts', 'published', 'agents', 'active agents', 'ai cost (usd)', 'ai requests'],
+        )
+        const sourceRows = Object.entries(summary.posts.bySource).map(([source, count]) => ({
+          source,
+          posts: count,
         }))
-        if (rows.length === 0) {
-          printer.log(`No usage data for period: ${summary.period}`)
-        } else {
-          printer.log(`Period: ${summary.period}`)
-          printer.table(rows, ['platform', 'posts', 'published', 'failed'])
-        }
+        printer.table(sourceRows, ['source', 'posts'])
       } catch (err) {
         spinner.stop()
         printer.error(err as Error)

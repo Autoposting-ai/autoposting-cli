@@ -3,7 +3,6 @@ import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
 import type { Post } from '../types/posts'
-import type { PaginatedResponse } from '../types'
 
 const BASE = 'https://app.autoposting.ai/api-proxy'
 
@@ -26,8 +25,10 @@ function makePost(overrides: Partial<Post> = {}): Post {
   }
 }
 
-function makePaginated(posts: Post[]): PaginatedResponse<Post> {
-  return { data: posts, total: posts.length, page: 1, limit: 20, hasMore: false }
+// Every backend success response is wrapped as { success: true, data: <payload> }.
+// The SDK unwraps it, so mocks must wrap and assertions check the unwrapped payload.
+function wrap<T>(data: T) {
+  return { success: true, data }
 }
 
 function makeClient() {
@@ -35,16 +36,14 @@ function makeClient() {
 }
 
 describe('posts.list()', () => {
-  it('sends GET /posts and returns paginated response', async () => {
-    const payload = makePaginated([makePost()])
+  it('sends GET /posts and returns the bare array (envelope unwrapped)', async () => {
+    const posts = [makePost()]
 
-    server.use(
-      http.get(`${BASE}/posts`, () => HttpResponse.json(payload)),
-    )
+    server.use(http.get(`${BASE}/posts`, () => HttpResponse.json(wrap(posts))))
 
     const client = makeClient()
     const result = await client.posts.list()
-    expect(result).toEqual(payload)
+    expect(result).toEqual(posts)
   })
 
   it('includes brandSlug query param when provided', async () => {
@@ -53,7 +52,7 @@ describe('posts.list()', () => {
     server.use(
       http.get(`${BASE}/posts`, ({ request }) => {
         capturedUrl = request.url
-        return HttpResponse.json(makePaginated([]))
+        return HttpResponse.json(wrap([]))
       }),
     )
 
@@ -69,7 +68,7 @@ describe('posts.list()', () => {
     server.use(
       http.get(`${BASE}/posts`, ({ request }) => {
         capturedUrl = request.url
-        return HttpResponse.json(makePaginated([]))
+        return HttpResponse.json(wrap([]))
       }),
     )
 
@@ -79,13 +78,13 @@ describe('posts.list()', () => {
     expect(new URL(capturedUrl).searchParams.get('status')).toBe('published')
   })
 
-  it('includes limit and page query params when provided', async () => {
+  it('translates limit + page into limit + offset (backend paginates by offset)', async () => {
     let capturedUrl = ''
 
     server.use(
       http.get(`${BASE}/posts`, ({ request }) => {
         capturedUrl = request.url
-        return HttpResponse.json(makePaginated([]))
+        return HttpResponse.json(wrap([]))
       }),
     )
 
@@ -94,17 +93,17 @@ describe('posts.list()', () => {
 
     const url = new URL(capturedUrl)
     expect(url.searchParams.get('limit')).toBe('5')
-    expect(url.searchParams.get('page')).toBe('2')
+    // page 2 @ limit 5 → offset 5; `page` is never sent to the backend
+    expect(url.searchParams.get('offset')).toBe('5')
+    expect(url.searchParams.get('page')).toBeNull()
   })
 })
 
 describe('posts.getById()', () => {
-  it('sends GET /posts/:id and returns a post', async () => {
+  it('sends GET /posts/:id and returns the unwrapped post', async () => {
     const post = makePost({ id: 'abc-123' })
 
-    server.use(
-      http.get(`${BASE}/posts/abc-123`, () => HttpResponse.json(post)),
-    )
+    server.use(http.get(`${BASE}/posts/abc-123`, () => HttpResponse.json(wrap(post))))
 
     const client = makeClient()
     const result = await client.posts.getById('abc-123')
@@ -120,7 +119,7 @@ describe('posts.create()', () => {
     server.use(
       http.post(`${BASE}/posts`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(post, { status: 201 })
+        return HttpResponse.json(wrap(post), { status: 201 })
       }),
     )
 
@@ -145,7 +144,9 @@ describe('posts.create()', () => {
     server.use(
       http.post(`${BASE}/posts`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(makePost({ status: 'scheduled', scheduledAt: '2024-06-01T10:00:00Z' }))
+        return HttpResponse.json(
+          wrap(makePost({ status: 'scheduled', scheduledAt: '2024-06-01T10:00:00Z' })),
+        )
       }),
     )
 
@@ -166,7 +167,7 @@ describe('posts.create()', () => {
     server.use(
       http.post(`${BASE}/posts`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(makePost(), { status: 201 })
+        return HttpResponse.json(wrap(makePost()), { status: 201 })
       }),
     )
 
@@ -190,7 +191,7 @@ describe('posts.update()', () => {
     server.use(
       http.put(`${BASE}/posts/post-1`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(post)
+        return HttpResponse.json(wrap(post))
       }),
     )
 
@@ -203,13 +204,13 @@ describe('posts.update()', () => {
 })
 
 describe('posts.remove()', () => {
-  it('sends DELETE /posts/:id', async () => {
+  it('sends DELETE /posts/:id and resolves', async () => {
     let deleteCalled = false
 
     server.use(
       http.delete(`${BASE}/posts/post-1`, () => {
         deleteCalled = true
-        return new HttpResponse(null, { status: 204 })
+        return HttpResponse.json(wrap({ id: 'post-1' }))
       }),
     )
 
@@ -223,9 +224,7 @@ describe('posts.publish()', () => {
   it('sends POST /posts/:id/publish', async () => {
     const post = makePost({ status: 'published', publishedAt: '2024-01-02T00:00:00Z' })
 
-    server.use(
-      http.post(`${BASE}/posts/post-1/publish`, () => HttpResponse.json(post)),
-    )
+    server.use(http.post(`${BASE}/posts/post-1/publish`, () => HttpResponse.json(wrap(post))))
 
     const client = makeClient()
     const result = await client.posts.publish('post-1')
@@ -241,7 +240,7 @@ describe('posts.schedule()', () => {
     server.use(
       http.put(`${BASE}/posts/post-1/schedule`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(post)
+        return HttpResponse.json(wrap(post))
       }),
     )
 
@@ -261,7 +260,7 @@ describe('posts.retry()', () => {
     server.use(
       http.post(`${BASE}/posts/post-1/retry`, () => {
         retryCalled = true
-        return HttpResponse.json(post)
+        return HttpResponse.json(wrap(post))
       }),
     )
 
@@ -275,9 +274,7 @@ describe('posts.rewrite()', () => {
   it('sends POST /posts/:id/rewrite', async () => {
     const rewritten = makePost({ text: 'Rewritten text' })
 
-    server.use(
-      http.post(`${BASE}/posts/post-1/rewrite`, () => HttpResponse.json(rewritten)),
-    )
+    server.use(http.post(`${BASE}/posts/post-1/rewrite`, () => HttpResponse.json(wrap(rewritten))))
 
     const client = makeClient()
     const result = await client.posts.rewrite('post-1')
@@ -286,16 +283,13 @@ describe('posts.rewrite()', () => {
 })
 
 describe('posts.score()', () => {
-  it('sends POST /posts/:id/score and returns score + feedback', async () => {
-    const scoreResult = { score: 87, feedback: 'Strong hook, clear CTA.' }
-
+  it('sends POST /posts/:id/score and returns the unwrapped score', async () => {
     server.use(
-      http.post(`${BASE}/posts/post-1/score`, () => HttpResponse.json(scoreResult)),
+      http.post(`${BASE}/posts/post-1/score`, () => HttpResponse.json(wrap({ score: 87 }))),
     )
 
     const client = makeClient()
     const result = await client.posts.score('post-1')
     expect(result.score).toBe(87)
-    expect(result.feedback).toBe('Strong hook, clear CTA.')
   })
 })

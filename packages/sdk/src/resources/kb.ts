@@ -18,8 +18,14 @@ export class KbResource extends Resource {
     return this.delete<void>(`/kbs/${id}`)
   }
 
-  search(id: string, query: string): Promise<SearchResult[]> {
-    return this.post<SearchResult[]>(`/kbs/${id}/search`, { query })
+  search(
+    id: string,
+    query: string,
+  ): Promise<{ query: string; limit: number; total: number; results: SearchResult[] }> {
+    return this.post<{ query: string; limit: number; total: number; results: SearchResult[] }>(
+      `/kbs/${id}/search`,
+      { query },
+    )
   }
 
   ingestUrl(id: string, url: string): Promise<KbDocument> {

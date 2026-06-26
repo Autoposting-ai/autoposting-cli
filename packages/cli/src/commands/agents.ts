@@ -33,7 +33,7 @@ export function createAgentsCommand(): Command {
         const client = new Autoposting({ apiKey: cred.apiKey })
         const list = await client.agents.list()
         spinner.stop()
-        const rows = list.map((a) => ({
+        const rows = list.items.map((a) => ({
           id: a.id,
           name: a.name,
           type: a.type,
@@ -197,9 +197,9 @@ export function createAgentsCommand(): Command {
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        const agentRun = await client.agents.run(id)
+        const queued = await client.agents.run(id)
         spinner.stop()
-        printer.log(agentRun)
+        printer.log({ runId: queued.runId, status: queued.status })
       } catch (err) {
         spinner.stop()
         printer.error(err as Error)
@@ -241,7 +241,7 @@ export function createAgentsCommand(): Command {
         const client = new Autoposting({ apiKey: cred.apiKey })
         const list = await client.agents.runs(id)
         spinner.stop()
-        const rows = list.map((r) => ({
+        const rows = list.items.map((r) => ({
           id: r.id,
           status: r.status,
           output: r.output ? (r.output.length > 60 ? `${r.output.slice(0, 57)}…` : r.output) : '—',
