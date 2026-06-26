@@ -30,6 +30,17 @@ describe('brands auth-status row (#33 username, #34 expiry)', () => {
     expect(buildAuthStatusRow(expiredX, NOW).expires).toBe('2026-05-05T13:12:58.106Z')
   })
 
+  it('an unparseable expiresAt reads expired, not "ok"', () => {
+    const malformed: PlatformConnection = {
+      platform: 'x',
+      connected: true,
+      platformUsername: 'live',
+      expiresAt: 'not-a-date',
+    }
+    expect(tokenStatus(malformed, NOW)).toBe('expired')
+    expect(buildAuthStatusRow(malformed, NOW)['token status']).toBe('expired')
+  })
+
   it('a future, healthy token reads ok', () => {
     const healthy: PlatformConnection = {
       platform: 'x',

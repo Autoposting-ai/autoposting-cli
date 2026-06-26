@@ -30,7 +30,7 @@ export function createWhoamiCommand(): Command {
       let validity: 'valid' | 'rejected' | 'unverified' = 'unverified'
       let identity: AuthProfile | undefined
       try {
-        const client = new Autoposting({ apiKey: cred.apiKey })
+        const client = new Autoposting({ apiKey: cred.apiKey, maxRetries: 0 })
         identity = await client.getProfile()
         validity = 'valid'
       } catch (err) {

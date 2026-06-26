@@ -228,7 +228,7 @@ export function createPostsCommand(): Command {
         // A failed delete (after the SDK's transient-retry gives up) may have left the
         // post in place — a NotFound means it's already gone, anything else is ambiguous.
         // Tell the user to verify so a still-scheduled post isn't silently orphaned.
-        if (!(err instanceof NotFoundError)) {
+        if (!(err instanceof NotFoundError) && printer.isTty()) {
           printer.error(`The post may not have been deleted — verify with: ap posts get "${id}"`)
         }
         process.exit(resolveExitCode(err))

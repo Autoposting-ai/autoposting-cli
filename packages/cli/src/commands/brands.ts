@@ -13,7 +13,10 @@ import { exitCodeFromError } from '../output/exit-codes.js'
 export function tokenStatus(c: PlatformConnection, now: number = Date.now()): string {
   if (!c.connected) return '—'
   if (c.refreshError) return 'expired'
-  if (c.expiresAt && Date.parse(c.expiresAt) <= now) return 'expired'
+  if (c.expiresAt) {
+    const expMs = Date.parse(c.expiresAt)
+    if (Number.isNaN(expMs) || expMs <= now) return 'expired'
+  }
   return 'ok'
 }
 
