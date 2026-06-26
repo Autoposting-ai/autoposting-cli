@@ -48,7 +48,7 @@ export function createBillingCommand(): Command {
           ['plan', 'status', 'cycle', 'accounts', 'credits', 'renews', 'trial ends'],
         )
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -86,7 +86,7 @@ export function createBillingCommand(): Command {
           printer.table(usageRows, ['date', 'description', 'amount', 'type'])
         }
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

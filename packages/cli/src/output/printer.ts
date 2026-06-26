@@ -4,6 +4,11 @@ import { createSpinner, type Spinner } from './spinner.js'
 export class Printer {
   constructor(private mode: OutputMode) {}
 
+  /** True only for human-readable output, where extra hint lines are safe to print. */
+  isTty(): boolean {
+    return this.mode === 'tty'
+  }
+
   log(data: unknown): void {
     const out = formatOutput(data, this.mode)
     if (out !== '') console.log(out)

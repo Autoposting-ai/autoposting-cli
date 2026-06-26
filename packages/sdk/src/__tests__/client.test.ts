@@ -166,8 +166,110 @@ describe('Autoposting client error handling', () => {
       ),
     )
 
-    const client = new Autoposting({ apiKey: 'key' })
+    const client = new Autoposting({ apiKey: 'key', maxRetries: 0 })
     await expect((client as any).request('GET', '/v1/test')).rejects.toBeInstanceOf(ServerError)
+  })
+})
+
+describe('Autoposting client getProfile (#36)', () => {
+  it('GETs /auth/profile and returns the unwrapped identity', async () => {
+    server.use(
+      http.get(`${BASE}/auth/profile`, () =>
+        HttpResponse.json({
+          success: true,
+          data: { id: 'org-x', orgId: 'org-x', name: 'API Key', email: '', authType: 'api_key' },
+        }),
+      ),
+    )
+    const client = new Autoposting({ apiKey: 'key' })
+    const profile = await client.getProfile()
+    expect(profile.orgId).toBe('org-x')
+    expect(profile.authType).toBe('api_key')
+  })
+})
+
+describe('Autoposting client retry (#38)', () => {
+  it('retries an idempotent GET on 503 then succeeds', async () => {
+    let calls = 0
+    server.use(
+      http.get(`${BASE}/flaky`, () => {
+        calls++
+        if (calls < 3) return HttpResponse.json({ error: 'unavailable' }, { status: 503 })
+        return HttpResponse.json({ success: true, data: { ok: true } })
+      }),
+    )
+    const client = new Autoposting({ apiKey: 'k', retryBaseMs: 1 })
+    const res = await (client as any).request('GET', '/flaky')
+    expect(calls).toBe(3)
+    expect(res).toEqual({ ok: true })
+  })
+
+  it('retries an idempotent GET on a network error then succeeds', async () => {
+    let calls = 0
+    server.use(
+      http.get(`${BASE}/neterr`, () => {
+        calls++
+        if (calls < 2) return HttpResponse.error()
+        return HttpResponse.json({ success: true, data: { ok: true } })
+      }),
+    )
+    const client = new Autoposting({ apiKey: 'k', retryBaseMs: 1 })
+    const res = await (client as any).request('GET', '/neterr')
+    expect(calls).toBe(2)
+    expect(res).toEqual({ ok: true })
+  })
+
+  it('retries DELETE (idempotent) on 503 — a transient failure must not orphan the resource', async () => {
+    let calls = 0
+    server.use(
+      http.delete(`${BASE}/posts/1`, () => {
+        calls++
+        if (calls < 2) return HttpResponse.json({ error: 'unavailable' }, { status: 503 })
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+    const client = new Autoposting({ apiKey: 'k', retryBaseMs: 1 })
+    await (client as any).request('DELETE', '/posts/1')
+    expect(calls).toBe(2)
+  })
+
+  it('does NOT retry POST (non-idempotent) on 503 — avoids a double-create', async () => {
+    let calls = 0
+    server.use(
+      http.post(`${BASE}/posts`, () => {
+        calls++
+        return HttpResponse.json({ error: 'unavailable' }, { status: 503 })
+      }),
+    )
+    const client = new Autoposting({ apiKey: 'k', retryBaseMs: 1 })
+    await expect((client as any).request('POST', '/posts', {})).rejects.toBeInstanceOf(ServerError)
+    expect(calls).toBe(1)
+  })
+
+  it('gives up after maxRetries and throws the last error', async () => {
+    let calls = 0
+    server.use(
+      http.get(`${BASE}/down`, () => {
+        calls++
+        return HttpResponse.json({ error: 'down' }, { status: 503 })
+      }),
+    )
+    const client = new Autoposting({ apiKey: 'k', retryBaseMs: 1, maxRetries: 2 })
+    await expect((client as any).request('GET', '/down')).rejects.toBeInstanceOf(ServerError)
+    expect(calls).toBe(3)
+  })
+
+  it('does NOT retry a 404 (not transient)', async () => {
+    let calls = 0
+    server.use(
+      http.get(`${BASE}/missing`, () => {
+        calls++
+        return HttpResponse.json({ error: 'gone', code: 'NOT_FOUND' }, { status: 404 })
+      }),
+    )
+    const client = new Autoposting({ apiKey: 'k', retryBaseMs: 1 })
+    await expect((client as any).request('GET', '/missing')).rejects.toBeInstanceOf(NotFoundError)
+    expect(calls).toBe(1)
   })
 })
 
@@ -196,7 +298,7 @@ describe('Autoposting client configuration', () => {
       }),
     )
 
-    const client = new Autoposting({ apiKey: 'key', timeout: 50 })
+    const client = new Autoposting({ apiKey: 'key', timeout: 50, maxRetries: 0 })
     await expect((client as any).request('GET', '/v1/slow')).rejects.toThrow()
   })
 })

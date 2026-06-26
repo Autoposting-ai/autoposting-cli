@@ -13,8 +13,10 @@ export interface Brand {
 export interface PlatformConnection {
   platform: Platform
   connected: boolean
-  username?: string
-  tokenExpired?: boolean
+  // Backend field names (proven against GET /brands/:slug/auth/status).
+  platformUsername?: string
+  expiresAt?: string
+  refreshError?: string
 }
 
 export interface CreateBrandParams {

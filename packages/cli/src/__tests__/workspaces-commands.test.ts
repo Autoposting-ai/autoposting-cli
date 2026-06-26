@@ -44,6 +44,20 @@ describe('ap workspaces list', () => {
     expect(result.exitCode).toBe(2)
     expect(result.stderr).toMatch(/No API key found/)
   })
+
+  // #39 — /orgs is session-only; under API-key auth the user must get accurate
+  // guidance (key is workspace-scoped), not a bare "Unauthorized" from a failed
+  // network call, and not a dead-end pointing at `ap login` (which stores an API key).
+  it('exits with actionable guidance under API-key auth (not a bare Unauthorized)', async () => {
+    const result = await ap(['workspaces', 'list'], {
+      ...baseEnv,
+      AUTOPOSTING_API_KEY: 'sk-social-test',
+    })
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stderr).toMatch(/session auth/i)
+    expect(result.stderr).toMatch(/single workspace/i)
+    expect(result.stderr).not.toMatch(/ap login/) // dead-end loop — must not appear
+  })
 })
 
 describe('ap workspaces switch', () => {

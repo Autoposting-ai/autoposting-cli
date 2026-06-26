@@ -42,7 +42,7 @@ export function createWebhooksCommand(): Command {
         }))
         printer.table(rows, ['id', 'url', 'events', 'active', 'createdAt'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -63,7 +63,7 @@ export function createWebhooksCommand(): Command {
         spinner.stop()
         printer.log(webhook)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -92,7 +92,7 @@ export function createWebhooksCommand(): Command {
           spinner.stop()
           printer.log(webhook)
         } catch (err) {
-          spinner.stop()
+          spinner.fail()
           printer.error(err as Error)
           process.exit(resolveExitCode(err))
         }
@@ -127,7 +127,7 @@ export function createWebhooksCommand(): Command {
           spinner.stop()
           printer.log(webhook)
         } catch (err) {
-          spinner.stop()
+          spinner.fail()
           printer.error(err as Error)
           process.exit(resolveExitCode(err))
         }
@@ -154,7 +154,7 @@ export function createWebhooksCommand(): Command {
         spinner.stop()
         printer.log(`Webhook "${id}" deleted.`)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -177,7 +177,7 @@ export function createWebhooksCommand(): Command {
           `Test event sent to webhook "${id}" — delivered: ${result.delivered ? 'yes' : 'no'} (HTTP ${result.httpStatus}).`,
         )
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

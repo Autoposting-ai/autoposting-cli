@@ -20,9 +20,31 @@ export interface AutopostingConfig {
   headers?: Record<string, string>
   /** Mark the auth source so workspace-switching can enforce API key restrictions. */
   authSource?: 'api-key' | 'session'
+  /** Max automatic retries for idempotent requests on transient failures. Default 2. */
+  maxRetries?: number
+  /** Base backoff in ms for retries (exponential ×2 per attempt, plus jitter). Default 300. */
+  retryBaseMs?: number
+}
+
+/** Server-resolved identity behind a credential (GET /auth/profile). */
+export interface AuthProfile {
+  id: string
+  orgId: string
+  name: string
+  email: string
+  authType: 'api_key' | 'session'
 }
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+// Only idempotent methods are safe to retry — retrying a POST/PATCH could double-create.
+const IDEMPOTENT_METHODS: ReadonlySet<HttpMethod> = new Set<HttpMethod>(['GET', 'PUT', 'DELETE'])
+// HTTP statuses that represent a transient server/proxy condition worth retrying.
+// 429 is intentionally excluded: it carries Retry-After and is surfaced to the caller
+// (auto-retrying it could hang for the full Retry-After window).
+const RETRYABLE_STATUS: ReadonlySet<number> = new Set([500, 502, 503, 504])
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 export class Autoposting {
   /** @internal Not part of the public API — use SDK methods to make requests. */
@@ -32,6 +54,8 @@ export class Autoposting {
   private readonly extraHeaders: Record<string, string>
   /** Indicates how the client was authenticated; used by WorkspacesResource. */
   readonly authSource: 'api-key' | 'session'
+  readonly maxRetries: number
+  private readonly retryBaseMs: number
   readonly agents: AgentsResource
   readonly billing: BillingResource
   readonly brands: BrandsResource
@@ -64,6 +88,8 @@ export class Autoposting {
     this.timeout = config.timeout ?? 30_000
     this.extraHeaders = config.headers ?? {}
     this.authSource = config.authSource ?? 'api-key'
+    this.maxRetries = Math.max(0, config.maxRetries ?? 2)
+    this.retryBaseMs = Math.max(0, config.retryBaseMs ?? 300)
     this.agents = new AgentsResource(this)
     this.billing = new BillingResource(this)
     this.brands = new BrandsResource(this)
@@ -77,7 +103,51 @@ export class Autoposting {
     this.workspaces = new WorkspacesResource(this)
   }
 
+  /**
+   * GET /auth/profile — resolve the server-side identity behind the current credential.
+   * Validates the key (401 on reject) and returns who/what it's scoped to.
+   */
+  getProfile(): Promise<AuthProfile> {
+    return this.request<AuthProfile>('GET', '/auth/profile')
+  }
+
+  /**
+   * Public entry point. Retries idempotent requests (GET/PUT/DELETE) on transient
+   * failures — network errors, timeouts, and 5xx — with exponential backoff + jitter.
+   * Non-idempotent methods (POST/PATCH) are never retried, to avoid duplicate side effects.
+   */
   async request<T = unknown>(
+    method: HttpMethod,
+    path: string,
+    body?: unknown,
+    query?: Record<string, unknown>,
+  ): Promise<T> {
+    let lastErr: unknown
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      if (attempt > 0) {
+        // Exponential backoff (base × 2^(attempt-1)) plus jitter to avoid thundering herds.
+        const backoff = this.retryBaseMs * 2 ** (attempt - 1)
+        await sleep(backoff + Math.floor(Math.random() * this.retryBaseMs))
+      }
+      try {
+        return await this._send<T>(method, path, body, query)
+      } catch (err) {
+        lastErr = err
+        if (attempt < this.maxRetries && this.isRetryable(method, err)) continue
+        throw err
+      }
+    }
+    throw lastErr
+  }
+
+  private isRetryable(method: HttpMethod, err: unknown): boolean {
+    if (!IDEMPOTENT_METHODS.has(method)) return false
+    if (!(err instanceof AutopostingError)) return false
+    if (err.code === 'NETWORK_ERROR' || err.code === 'TIMEOUT') return true
+    return RETRYABLE_STATUS.has(err.status)
+  }
+
+  private async _send<T = unknown>(
     method: HttpMethod,
     path: string,
     body?: unknown,

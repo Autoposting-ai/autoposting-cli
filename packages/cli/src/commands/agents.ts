@@ -43,7 +43,7 @@ export function createAgentsCommand(): Command {
         }))
         printer.table(rows, ['id', 'name', 'type', 'brand', 'frequency', 'enabled'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -64,7 +64,7 @@ export function createAgentsCommand(): Command {
         spinner.stop()
         printer.log(agent)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -115,7 +115,7 @@ export function createAgentsCommand(): Command {
           spinner.stop()
           printer.log(agent)
         } catch (err) {
-          spinner.stop()
+          spinner.fail()
           printer.error(err as Error)
           process.exit(resolveExitCode(err))
         }
@@ -153,7 +153,7 @@ export function createAgentsCommand(): Command {
           spinner.stop()
           printer.log(agent)
         } catch (err) {
-          spinner.stop()
+          spinner.fail()
           printer.error(err as Error)
           process.exit(resolveExitCode(err))
         }
@@ -180,7 +180,7 @@ export function createAgentsCommand(): Command {
         spinner.stop()
         printer.log(`Agent "${id}" deleted.`)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -201,7 +201,7 @@ export function createAgentsCommand(): Command {
         spinner.stop()
         printer.log({ runId: queued.runId, status: queued.status })
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -222,7 +222,7 @@ export function createAgentsCommand(): Command {
         spinner.stop()
         printer.log(agent)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -249,7 +249,7 @@ export function createAgentsCommand(): Command {
         }))
         printer.table(rows, ['id', 'status', 'output', 'createdAt'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

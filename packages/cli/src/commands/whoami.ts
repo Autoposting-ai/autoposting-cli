@@ -1,5 +1,6 @@
 import { Command } from 'commander'
 import { Autoposting } from '@autoposting.ai/sdk'
+import type { AuthProfile } from '@autoposting.ai/sdk'
 import { resolveAuth } from '../auth/auth-manager.js'
 import { readCredentials } from '../auth/credential-store.js'
 import { EXIT_CODES, exitCodeFromError } from '../output/exit-codes.js'
@@ -21,16 +22,16 @@ export function createWhoamiCommand(): Command {
 
       const masked = `${cred.apiKey.slice(0, 8)}${'*'.repeat(Math.max(0, cred.apiKey.length - 8))}`
 
-      // Validate the key against an API-key-authenticated endpoint. /usage/summary runs the
-      // shared authenticate middleware (which accepts the Bearer API key) and is not scope-
-      // gated, so any valid key returns 200 and an invalid/revoked one returns 401. We only
-      // care that the call succeeds — the response body is irrelevant. A network/transport
-      // failure must NOT fail whoami: degrade to "unverified" so it still works offline;
-      // only a definitive rejection (401/403) exits non-zero.
+      // Validate the key AND resolve the server-side identity in one call. /auth/profile runs
+      // the shared authenticate middleware (accepts the Bearer API key), so a valid key returns
+      // 200 + identity (orgId, authType) and an invalid/revoked one returns 401. A network/
+      // transport failure must NOT fail whoami: degrade to "unverified" so it still works
+      // offline; only a definitive rejection (401/403) exits non-zero.
       let validity: 'valid' | 'rejected' | 'unverified' = 'unverified'
+      let identity: AuthProfile | undefined
       try {
-        const client = new Autoposting({ apiKey: cred.apiKey })
-        await client.usage.summary()
+        const client = new Autoposting({ apiKey: cred.apiKey, maxRetries: 0 })
+        identity = await client.getProfile()
         validity = 'valid'
       } catch (err) {
         const code = exitCodeFromError(err)
@@ -53,6 +54,11 @@ export function createWhoamiCommand(): Command {
           valid: validity === 'valid',
           validity,
         }
+        if (identity?.orgId) {
+          out.orgId = identity.orgId
+          out.authType = identity.authType
+          if (identity.email) out.email = identity.email
+        }
         if (cred.source === 'stored') {
           out.profile = profileName
           if (email) out.email = email
@@ -67,6 +73,10 @@ export function createWhoamiCommand(): Command {
       if (cred.source === 'stored') {
         console.log(`Profile: ${profileName}`)
         if (email) console.log(`Email:   ${email}`)
+      }
+      if (identity?.orgId) {
+        console.log(`Org:     ${identity.orgId}`)
+        console.log(`Auth:    ${identity.authType}`)
       }
       const tag =
         validity === 'valid'

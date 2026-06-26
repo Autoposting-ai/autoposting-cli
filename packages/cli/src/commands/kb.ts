@@ -41,7 +41,7 @@ export function createKbCommand(): Command {
         }))
         printer.table(rows, ['id', 'name', 'docs', 'createdAt'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -62,7 +62,7 @@ export function createKbCommand(): Command {
         spinner.stop()
         printer.log(result)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -84,7 +84,7 @@ export function createKbCommand(): Command {
         spinner.stop()
         printer.log(result)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -110,7 +110,7 @@ export function createKbCommand(): Command {
         spinner.stop()
         printer.log(`Knowledge base "${id}" deleted.`)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -138,7 +138,7 @@ export function createKbCommand(): Command {
         }))
         printer.table(rows, ['kind', 'score', 'uri', 'content'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -160,7 +160,7 @@ export function createKbCommand(): Command {
         spinner.stop()
         printer.log(doc)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -188,7 +188,7 @@ export function createKbCommand(): Command {
         }))
         printer.table(rows, ['id', 'name', 'type', 'status', 'createdAt'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

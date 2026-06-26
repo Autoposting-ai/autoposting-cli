@@ -30,6 +30,8 @@ export function createWorkspacesCommand(): Command {
       const spinner = printer.spinner('Fetching workspaces…')
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
+        // CLI auth is always an API key, so the SDK's default authSource ('api-key')
+        // makes workspaces.list() fail fast with guidance instead of a bare 401.
         const client = new Autoposting({ apiKey: cred.apiKey })
         const res = await client.workspaces.list()
         spinner.stop()
@@ -42,7 +44,7 @@ export function createWorkspacesCommand(): Command {
         }))
         printer.table(rows, ['id', 'name', 'slug', 'active', 'createdAt'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -58,16 +60,14 @@ export function createWorkspacesCommand(): Command {
       const spinner = printer.spinner(`Switching to workspace "${id}"…`)
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
-        // Pass the auth source so the SDK can enforce the API key restriction.
-        const authSource = cred.source === 'flag' || cred.source === 'env' || cred.source === 'stored'
-          ? 'api-key'
-          : 'session'
-        const client = new Autoposting({ apiKey: cred.apiKey, authSource })
+        // CLI auth is always an API key; the SDK's default authSource ('api-key')
+        // makes switchWorkspace() reject with guidance (switching needs session auth).
+        const client = new Autoposting({ apiKey: cred.apiKey })
         await client.workspaces.switchWorkspace(id)
         spinner.stop()
         printer.log(`Switched to workspace "${id}".`)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

@@ -1,8 +1,34 @@
 import { Command } from 'commander'
 import { Autoposting } from '@autoposting.ai/sdk'
+import type { PlatformConnection } from '@autoposting.ai/sdk'
 import { resolveAuth } from '../auth/auth-manager.js'
 import { createPrinter } from '../output/printer.js'
 import { exitCodeFromError } from '../output/exit-codes.js'
+
+/**
+ * Classify a platform connection's token. A connection is only "ok" when it's
+ * connected, has no refresh failure, and isn't past its expiry — otherwise the
+ * token can't actually post, so reporting "ok" (the old behavior) was misleading.
+ */
+export function tokenStatus(c: PlatformConnection, now: number = Date.now()): string {
+  if (!c.connected) return '—'
+  if (c.refreshError) return 'expired'
+  if (c.expiresAt) {
+    const expMs = Date.parse(c.expiresAt)
+    if (Number.isNaN(expMs) || expMs <= now) return 'expired'
+  }
+  return 'ok'
+}
+
+export function buildAuthStatusRow(c: PlatformConnection, now: number = Date.now()) {
+  return {
+    platform: c.platform,
+    connected: c.connected ? 'yes' : 'no',
+    username: c.platformUsername ?? '—',
+    'token status': tokenStatus(c, now),
+    expires: c.expiresAt ?? '—',
+  }
+}
 
 export function createBrandsCommand(): Command {
   const brands = new Command('brands').description('Manage brands')
@@ -36,7 +62,7 @@ export function createBrandsCommand(): Command {
         }))
         printer.table(rows, ['slug', 'name', 'platforms', 'timezone'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(exitCodeFromError(err))
       }
@@ -62,7 +88,7 @@ export function createBrandsCommand(): Command {
         spinner.stop()
         printer.log(brand)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(exitCodeFromError(err))
       }
@@ -93,7 +119,7 @@ export function createBrandsCommand(): Command {
         spinner.stop()
         printer.log(brand)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(exitCodeFromError(err))
       }
@@ -124,7 +150,7 @@ export function createBrandsCommand(): Command {
         spinner.stop()
         printer.log(brand)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(exitCodeFromError(err))
       }
@@ -155,7 +181,7 @@ export function createBrandsCommand(): Command {
         spinner.stop()
         printer.log(`Brand "${slug}" deleted.`)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(exitCodeFromError(err))
       }
@@ -179,15 +205,10 @@ export function createBrandsCommand(): Command {
         const client = new Autoposting({ apiKey: cred.apiKey })
         const connections = await client.brands.authStatus(slug)
         spinner.stop()
-        const rows = connections.map((c) => ({
-          platform: c.platform,
-          connected: c.connected ? 'yes' : 'no',
-          username: c.username ?? '—',
-          'token status': c.tokenExpired === true ? 'expired' : c.connected ? 'ok' : '—',
-        }))
-        printer.table(rows, ['platform', 'connected', 'username', 'token status'])
+        const rows = connections.map((c) => buildAuthStatusRow(c))
+        printer.table(rows, ['platform', 'connected', 'username', 'token status', 'expires'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(exitCodeFromError(err))
       }

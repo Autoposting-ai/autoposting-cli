@@ -3,7 +3,9 @@ import type { OutputMode } from './formatter.js'
 export interface Spinner {
   start(message: string): void
   stop(message?: string): void
-  fail(message: string): void
+  // Mark the in-flight operation as failed (✖). Message optional: a catch block
+  // typically fails the spinner, then prints the real error separately.
+  fail(message?: string): void
 }
 
 // No-op spinner for JSON/quiet modes — no TTY output during machine-readable runs
@@ -36,11 +38,12 @@ class OraSpinner implements Spinner {
     }
   }
 
-  fail(message: string): void {
+  fail(message?: string): void {
     if (this.instance) {
+      // ora.fail(undefined) keeps the original spinner text but marks it ✖.
       this.instance.fail(message)
       this.instance = null
-    } else {
+    } else if (message) {
       process.stderr.write(`${message}\n`)
     }
   }

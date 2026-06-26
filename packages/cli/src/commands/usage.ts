@@ -53,7 +53,7 @@ export function createUsageCommand(): Command {
         }))
         printer.table(sourceRows, ['source', 'posts'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

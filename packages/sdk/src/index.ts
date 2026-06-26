@@ -1,4 +1,4 @@
-export { Autoposting, type AutopostingConfig } from './client'
+export { Autoposting, type AutopostingConfig, type AuthProfile } from './client'
 export { AgentsResource } from './resources/agents'
 export type { Agent, AgentRun, CreateAgentParams, UpdateAgentParams } from './types/agents'
 export { BillingResource } from './resources/billing'
