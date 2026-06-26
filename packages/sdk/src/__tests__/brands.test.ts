@@ -12,7 +12,7 @@ const mockBrand: Brand = {
   name: 'My Brand',
   timezone: 'America/New_York',
   platforms: [
-    { platform: 'x', connected: true, username: '@mybrand' },
+    { platform: 'x', connected: true, platformUsername: '@mybrand' },
     { platform: 'linkedin', connected: false },
   ],
   createdAt: '2024-01-01T00:00:00Z',
@@ -20,7 +20,7 @@ const mockBrand: Brand = {
 }
 
 const mockConnections: PlatformConnection[] = [
-  { platform: 'x', connected: true, username: '@mybrand', tokenExpired: false },
+  { platform: 'x', connected: true, platformUsername: '@mybrand', expiresAt: '2099-01-01T00:00:00Z' },
   { platform: 'linkedin', connected: false },
 ]
 

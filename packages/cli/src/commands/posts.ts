@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { Autoposting } from '@autoposting.ai/sdk'
+import { Autoposting, NotFoundError } from '@autoposting.ai/sdk'
 import type { Platform } from '@autoposting.ai/sdk'
 import { resolveAuth } from '../auth/auth-manager.js'
 import { createPrinter } from '../output/printer.js'
@@ -39,9 +39,18 @@ function parsePositiveInt(value: string, flag: string): number {
 function validateScheduledAt(value: string): string {
   // Require a real ISO 8601 datetime. Date.parse alone is lenient (accepts locale formats
   // like "01/02/2026"), so also require the YYYY-MM-DDTHH:MM prefix the API expects.
-  if (Number.isNaN(Date.parse(value)) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
+  const ms = Date.parse(value)
+  if (Number.isNaN(ms) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
     throw new Error(
       `--at must be a valid ISO 8601 datetime, e.g. 2026-06-30T14:00:00Z (received "${value}").`,
+    )
+  }
+  // A past time means the post would publish immediately on submit — almost never intended,
+  // and irreversible for an instant publish. Reject it here, before any create/schedule call.
+  if (ms <= Date.now()) {
+    throw new Error(
+      `--at must be in the future (received "${value}", which is in the past). ` +
+        `A past schedule time publishes immediately.`,
     )
   }
   return value
@@ -93,7 +102,7 @@ export function createPostsCommand(): Command {
         }))
         printer.table(rows, ['id', 'brand', 'status', 'platforms', 'text', 'scheduledAt'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -114,7 +123,7 @@ export function createPostsCommand(): Command {
         spinner.stop()
         printer.log(post)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -153,7 +162,7 @@ export function createPostsCommand(): Command {
           spinner.stop()
           printer.log(post)
         } catch (err) {
-          spinner.stop()
+          spinner.fail()
           printer.error(err as Error)
           process.exit(resolveExitCode(err))
         }
@@ -187,7 +196,7 @@ export function createPostsCommand(): Command {
           spinner.stop()
           printer.log(post)
         } catch (err) {
-          spinner.stop()
+          spinner.fail()
           printer.error(err as Error)
           process.exit(resolveExitCode(err))
         }
@@ -214,8 +223,14 @@ export function createPostsCommand(): Command {
         spinner.stop()
         printer.log(`Post "${id}" deleted.`)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
+        // A failed delete (after the SDK's transient-retry gives up) may have left the
+        // post in place — a NotFound means it's already gone, anything else is ambiguous.
+        // Tell the user to verify so a still-scheduled post isn't silently orphaned.
+        if (!(err instanceof NotFoundError)) {
+          printer.error(`The post may not have been deleted — verify with: ap posts get "${id}"`)
+        }
         process.exit(resolveExitCode(err))
       }
     })
@@ -235,7 +250,7 @@ export function createPostsCommand(): Command {
         spinner.stop()
         printer.log(post)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -257,7 +272,7 @@ export function createPostsCommand(): Command {
         spinner.stop()
         printer.log(post)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -278,7 +293,7 @@ export function createPostsCommand(): Command {
         spinner.stop()
         printer.log(post)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -299,7 +314,7 @@ export function createPostsCommand(): Command {
         spinner.stop()
         printer.log(post)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -320,7 +335,7 @@ export function createPostsCommand(): Command {
         spinner.stop()
         printer.log(result)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

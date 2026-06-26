@@ -42,7 +42,7 @@ export function createCarouselsCommand(): Command {
         }))
         printer.table(rows, ['id', 'title', 'slides', 'status', 'createdAt'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -63,7 +63,7 @@ export function createCarouselsCommand(): Command {
         spinner.stop()
         printer.log(carousel)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -87,7 +87,7 @@ export function createCarouselsCommand(): Command {
         spinner.stop()
         printer.log(carousel)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -115,7 +115,7 @@ export function createCarouselsCommand(): Command {
         spinner.stop()
         printer.log(carousel)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -136,7 +136,7 @@ export function createCarouselsCommand(): Command {
         spinner.stop()
         printer.log(result)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -162,7 +162,7 @@ export function createCarouselsCommand(): Command {
         spinner.stop()
         printer.log(`Carousel "${id}" deleted.`)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

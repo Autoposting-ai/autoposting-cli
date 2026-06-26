@@ -68,7 +68,7 @@ export function createIdeasCommand(): Command {
         }))
         printer.table(rows, ['id', 'platform', 'score', 'title'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -97,7 +97,7 @@ export function createIdeasCommand(): Command {
         }))
         printer.table(rows, ['id', 'topic', 'platform', 'score', 'status', 'title'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -132,7 +132,7 @@ export function createIdeasCommand(): Command {
           spinner.stop()
           printer.log(`Enrichment queued. Job ID: ${jobId}`)
         } catch (err) {
-          spinner.stop()
+          spinner.fail()
           printer.error(err as Error)
           process.exit(resolveExitCode(err))
         }
@@ -159,7 +159,7 @@ export function createIdeasCommand(): Command {
         spinner.stop()
         printer.log(`Idea "${id}" deleted.`)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

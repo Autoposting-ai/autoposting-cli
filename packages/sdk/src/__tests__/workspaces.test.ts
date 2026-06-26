@@ -29,10 +29,19 @@ describe('workspaces.list()', () => {
         HttpResponse.json(wrap({ organizations, activeOrgId: 'org-1' })),
       ),
     )
-    const client = new Autoposting({ apiKey: 'test-key' })
+    // /orgs is session-only, so listing requires session auth.
+    const client = new Autoposting({ apiKey: 'test-key', authSource: 'session' })
     const result = await client.workspaces.list()
     expect(result.organizations).toHaveLength(2)
     expect(result.activeOrgId).toBe('org-1')
+  })
+
+  // #39 — under API-key auth, /orgs 401s with a bare "Unauthorized". Guard it up front
+  // with actionable guidance instead of letting the request fail opaquely.
+  it('rejects with actionable guidance when authSource is api-key (no network call)', async () => {
+    const client = new Autoposting({ apiKey: 'test-key', authSource: 'api-key' })
+    await expect(client.workspaces.list()).rejects.toThrow(/session auth/i)
+    await expect(client.workspaces.list()).rejects.toThrow(/ap login/)
   })
 })
 

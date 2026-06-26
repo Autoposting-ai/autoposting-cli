@@ -41,7 +41,7 @@ export function createClipsCommand(): Command {
         }))
         printer.table(rows, ['id', 'name', 'status', 'duration'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -62,7 +62,7 @@ export function createClipsCommand(): Command {
         spinner.stop()
         printer.log(clip)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -89,7 +89,7 @@ export function createClipsCommand(): Command {
         spinner.stop()
         printer.log(clip)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -115,7 +115,7 @@ export function createClipsCommand(): Command {
         spinner.stop()
         printer.log({ clipId })
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -136,7 +136,7 @@ export function createClipsCommand(): Command {
         spinner.stop()
         printer.log({ jobIds, activeJobIds, reusedJobIds })
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -162,7 +162,7 @@ export function createClipsCommand(): Command {
         spinner.stop()
         printer.log(`Clip "${id}" deleted.`)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

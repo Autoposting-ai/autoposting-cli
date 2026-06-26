@@ -30,7 +30,11 @@ export function createWorkspacesCommand(): Command {
       const spinner = printer.spinner('Fetching workspaces…')
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
-        const client = new Autoposting({ apiKey: cred.apiKey })
+        // Pass the auth source so the SDK can fail fast with guidance under API-key auth.
+        const authSource = cred.source === 'flag' || cred.source === 'env' || cred.source === 'stored'
+          ? 'api-key'
+          : 'session'
+        const client = new Autoposting({ apiKey: cred.apiKey, authSource })
         const res = await client.workspaces.list()
         spinner.stop()
         const rows = res.organizations.map((w) => ({
@@ -42,7 +46,7 @@ export function createWorkspacesCommand(): Command {
         }))
         printer.table(rows, ['id', 'name', 'slug', 'active', 'createdAt'])
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }
@@ -67,7 +71,7 @@ export function createWorkspacesCommand(): Command {
         spinner.stop()
         printer.log(`Switched to workspace "${id}".`)
       } catch (err) {
-        spinner.stop()
+        spinner.fail()
         printer.error(err as Error)
         process.exit(resolveExitCode(err))
       }

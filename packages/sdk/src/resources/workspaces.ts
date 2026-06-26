@@ -9,9 +9,17 @@ export class WorkspacesResource extends Resource {
 
   /**
    * GET /orgs — backend returns `{ organizations, activeOrgId }`, not a bare array.
-   * NOTE: this route is session-only (better-auth session); an API key receives 401.
+   * This route is session-only (better-auth session); an API key receives a bare 401,
+   * so guard up front with actionable guidance instead of an opaque "Unauthorized".
    */
   list(): Promise<{ organizations: Workspace[]; activeOrgId: string }> {
+    if (this.client.authSource === 'api-key') {
+      return Promise.reject(
+        new Error(
+          'Listing workspaces requires session auth. API keys are scoped to a single workspace — run `ap login` to use session auth.',
+        ),
+      )
+    }
     return this.get<{ organizations: Workspace[]; activeOrgId: string }>('/orgs')
   }
 

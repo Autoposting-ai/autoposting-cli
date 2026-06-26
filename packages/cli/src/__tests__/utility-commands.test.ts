@@ -159,6 +159,32 @@ describe('ap whoami', () => {
     )
   })
 
+  // #36 — whoami must resolve and show the server-side identity (org + auth type),
+  // not just confirm the key is valid.
+  it('shows the resolved org and auth type when the server returns an identity', async () => {
+    await withMockApi(
+      (_req, res) => {
+        res.setHeader('content-type', 'application/json')
+        res.end(
+          JSON.stringify({
+            success: true,
+            data: { id: 'org-9', orgId: 'org-9', name: 'API Key', email: '', authType: 'api_key' },
+          }),
+        )
+      },
+      async (baseUrl) => {
+        const result = await ap(['whoami'], {
+          ...baseEnv,
+          AUTOPOSTING_API_KEY: 'sk-social-testkey',
+          AUTOPOSTING_BASE_URL: baseUrl,
+        })
+        expect(result.exitCode).toBe(0)
+        expect(result.stdout).toContain('org-9')
+        expect(result.stdout).toMatch(/api_key/)
+      },
+    )
+  })
+
   it('exits 2 when the server rejects the key (401)', async () => {
     await withMockApi(
       (_req, res) => {
