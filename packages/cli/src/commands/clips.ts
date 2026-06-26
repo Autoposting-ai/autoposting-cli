@@ -33,7 +33,7 @@ export function createClipsCommand(): Command {
         const client = new Autoposting({ apiKey: cred.apiKey })
         const list = await client.clips.list()
         spinner.stop()
-        const rows = list.map((c) => ({
+        const rows = list.clips.map((c) => ({
           id: c.id,
           name: c.name,
           status: c.status,
@@ -108,12 +108,12 @@ export function createClipsCommand(): Command {
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        const clip = await client.clips.importUrl({
+        const { clipId } = await client.clips.importUrl({
           url: opts.url,
           ...(opts.name ? { name: opts.name } : {}),
         })
         spinner.stop()
-        printer.log(clip)
+        printer.log({ clipId })
       } catch (err) {
         spinner.stop()
         printer.error(err as Error)
@@ -132,9 +132,9 @@ export function createClipsCommand(): Command {
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        const clip = await client.clips.render(id)
+        const { jobIds, activeJobIds, reusedJobIds } = await client.clips.render(id)
         spinner.stop()
-        printer.log(clip)
+        printer.log({ jobIds, activeJobIds, reusedJobIds })
       } catch (err) {
         spinner.stop()
         printer.error(err as Error)

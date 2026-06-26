@@ -262,7 +262,17 @@ async function dispatchToolCall(
       return ok(result)
     }
     case 'enrich-idea': {
-      const result = await client.ideas.enrich(args.id as string)
+      const result = await client.ideas.enrich({
+        idea: {
+          title: args.title as string,
+          hook: args.hook as string,
+          angle: args.angle as string,
+        },
+        platforms: (args.platforms as string[]).map((platform) => ({
+          platform: platform as 'twitter' | 'linkedin' | 'instagram' | 'youtube' | 'threads',
+        })),
+        ...(args.kbId ? { kbId: args.kbId as string } : {}),
+      })
       return ok(result)
     }
     case 'delete-idea': {

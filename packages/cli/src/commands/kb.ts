@@ -128,14 +128,15 @@ export function createKbCommand(): Command {
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        const results = await client.kb.search(id, opts.query)
+        const res = await client.kb.search(id, opts.query)
         spinner.stop()
-        const rows = results.map((r) => ({
-          docId: r.docId,
-          score: r.score.toFixed(3),
+        const rows = res.results.map((r) => ({
+          kind: r.kind,
+          score: r.score != null ? r.score.toFixed(3) : '—',
+          uri: r.uri ?? '—',
           content: r.content.length > 80 ? `${r.content.slice(0, 77)}…` : r.content,
         }))
-        printer.table(rows, ['docId', 'score', 'content'])
+        printer.table(rows, ['kind', 'score', 'uri', 'content'])
       } catch (err) {
         spinner.stop()
         printer.error(err as Error)

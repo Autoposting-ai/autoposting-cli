@@ -24,7 +24,11 @@ export interface OutputOptions {
 
 export function detectOutputMode(options: OutputOptions): OutputMode {
   if (options.quiet) return 'quiet'
-  if (options.json || !process.stdout.isTTY) return 'json'
+  // An explicit --format wins over auto-detection; otherwise fall back to JSON when
+  // output is piped (non-TTY) and human-readable when attached to a terminal.
+  if (options.format === 'json' || options.json) return 'json'
+  if (options.format === 'table') return 'tty'
+  if (!process.stdout.isTTY) return 'json'
   return 'tty'
 }
 

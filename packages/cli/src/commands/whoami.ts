@@ -1,44 +1,80 @@
 import { Command } from 'commander'
+import { Autoposting } from '@autoposting.ai/sdk'
 import { resolveAuth } from '../auth/auth-manager.js'
 import { readCredentials } from '../auth/credential-store.js'
+import { EXIT_CODES, exitCodeFromError } from '../output/exit-codes.js'
 
 export function createWhoamiCommand(): Command {
   return new Command('whoami')
-    .description('Show current authentication identity (alias for `auth whoami`)')
-    .action((_opts: Record<string, unknown>, cmd: Command) => {
+    .description('Show the current identity and validate the key against the server')
+    .action(async (_opts: Record<string, unknown>, cmd: Command) => {
+      const globals = cmd.optsWithGlobals<{ apiKey?: string; json?: boolean }>()
+
+      let cred: ReturnType<typeof resolveAuth>
       try {
-        const globals = cmd.optsWithGlobals<{ apiKey?: string; json?: boolean }>()
-        const cred = resolveAuth({ apiKey: globals.apiKey })
-
-        const masked = `${cred.apiKey.slice(0, 8)}${'*'.repeat(Math.max(0, cred.apiKey.length - 8))}`
-
-        if (globals.json) {
-          const out: Record<string, string> = { source: cred.source, apiKey: masked }
-          if (cred.source === 'stored') {
-            const creds = readCredentials()
-            const profileName = creds?.activeProfile ?? 'unknown'
-            const profile = creds?.profiles[profileName]
-            out.profile = profileName
-            if (profile?.workspace) out.workspace = profile.workspace
-            if (profile?.email) out.email = profile.email
-          }
-          console.log(JSON.stringify(out, null, 2))
-          return
-        }
-
-        console.log(`Source:  ${cred.source}`)
-        if (cred.source === 'stored') {
-          const creds = readCredentials()
-          const profileName = creds?.activeProfile ?? 'unknown'
-          const profile = creds?.profiles[profileName]
-          console.log(`Profile: ${profileName}`)
-          if (profile?.workspace) console.log(`Workspace: ${profile.workspace}`)
-          if (profile?.email) console.log(`Email:     ${profile.email}`)
-        }
-        console.log(`API key: ${masked}`)
+        cred = resolveAuth({ apiKey: globals.apiKey })
       } catch (err) {
         console.error(`Error: ${(err as Error).message}`)
-        process.exit(2)
+        process.exitCode = exitCodeFromError(err)
+        return
       }
+
+      const masked = `${cred.apiKey.slice(0, 8)}${'*'.repeat(Math.max(0, cred.apiKey.length - 8))}`
+
+      // Validate the key against an API-key-authenticated endpoint. /usage/summary runs the
+      // shared authenticate middleware (which accepts the Bearer API key) and is not scope-
+      // gated, so any valid key returns 200 and an invalid/revoked one returns 401. We only
+      // care that the call succeeds — the response body is irrelevant. A network/transport
+      // failure must NOT fail whoami: degrade to "unverified" so it still works offline;
+      // only a definitive rejection (401/403) exits non-zero.
+      let validity: 'valid' | 'rejected' | 'unverified' = 'unverified'
+      try {
+        const client = new Autoposting({ apiKey: cred.apiKey })
+        await client.usage.summary()
+        validity = 'valid'
+      } catch (err) {
+        const code = exitCodeFromError(err)
+        validity =
+          code === EXIT_CODES.AUTH_ERROR || code === EXIT_CODES.SCOPE_ERROR
+            ? 'rejected'
+            : 'unverified'
+      }
+
+      const exitCode = validity === 'rejected' ? EXIT_CODES.AUTH_ERROR : 0
+
+      const creds = cred.source === 'stored' ? readCredentials() : undefined
+      const profileName = creds?.activeProfile ?? 'unknown'
+      const email = creds?.profiles[profileName]?.email
+
+      if (globals.json) {
+        const out: Record<string, unknown> = {
+          source: cred.source,
+          apiKey: masked,
+          valid: validity === 'valid',
+          validity,
+        }
+        if (cred.source === 'stored') {
+          out.profile = profileName
+          if (email) out.email = email
+        }
+        console.log(JSON.stringify(out, null, 2))
+        // Set exitCode (not process.exit) so a piped --json stream flushes fully before exit.
+        process.exitCode = exitCode
+        return
+      }
+
+      console.log(`Source:  ${cred.source}`)
+      if (cred.source === 'stored') {
+        console.log(`Profile: ${profileName}`)
+        if (email) console.log(`Email:   ${email}`)
+      }
+      const tag =
+        validity === 'valid'
+          ? '✓ valid'
+          : validity === 'rejected'
+            ? '✗ rejected by server'
+            : '⚠ unverified (could not reach server)'
+      console.log(`API key: ${masked}  ${tag}`)
+      process.exitCode = exitCode
     })
 }

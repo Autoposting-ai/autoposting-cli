@@ -34,7 +34,8 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run pack:smoke
-      - run: npm audit --audit-level=moderate
+      # Audit shipped deps only — dev-only tooling (changesets) vulns never reach the published tarball.
+      - run: npm audit --omit=dev --audit-level=moderate
       - name: Publish SDK
         run: npm publish --workspace=packages/sdk --access public
         env:

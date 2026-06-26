@@ -171,9 +171,11 @@ export function createWebhooksCommand(): Command {
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        await client.webhooks.test(id)
+        const result = await client.webhooks.test(id)
         spinner.stop()
-        printer.log(`Test event sent to webhook "${id}".`)
+        printer.log(
+          `Test event sent to webhook "${id}" — delivered: ${result.delivered ? 'yes' : 'no'} (HTTP ${result.httpStatus}).`,
+        )
       } catch (err) {
         spinner.stop()
         printer.error(err as Error)

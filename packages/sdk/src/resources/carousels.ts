@@ -1,9 +1,11 @@
 import { Resource } from '../resource'
+import type { Paginated } from '../types'
 import type { Carousel, CreateCarouselParams, GenerateCarouselParams } from '../types/carousels'
 
 export class CarouselsResource extends Resource {
-  list(): Promise<Carousel[]> {
-    return this.get<Carousel[]>('/carousels')
+  /** GET /carousels — backend paginates: `{ items, total, limit, offset }`. */
+  list(): Promise<Paginated<Carousel>> {
+    return this.get<Paginated<Carousel>>('/carousels')
   }
 
   retrieve(id: string): Promise<Carousel> {
@@ -18,9 +20,9 @@ export class CarouselsResource extends Resource {
     return this.post<Carousel>('/carousels/generate', params)
   }
 
-  /** POST /carousels/:id/draft — converts carousel to a post draft */
+  /** POST /carousels/:id/create-draft — converts carousel to a post draft */
   draft(id: string): Promise<Carousel> {
-    return this.post<Carousel>(`/carousels/${id}/draft`)
+    return this.post<Carousel>(`/carousels/${id}/create-draft`)
   }
 
   remove(id: string): Promise<void> {

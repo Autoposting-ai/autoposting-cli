@@ -4,13 +4,18 @@ import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
 import type { Webhook } from '../types/webhooks'
 
-const BASE = 'https://app.autoposting.ai'
+const BASE = 'https://app.autoposting.ai/api-proxy'
 
 const server = setupServer()
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
+
+// Every backend success response is wrapped as { success: true, data: <payload> }.
+function wrap<T>(data: T) {
+  return { success: true, data }
+}
 
 function makeWebhook(overrides: Partial<Webhook> = {}): Webhook {
   return {
@@ -28,18 +33,18 @@ function makeClient() {
 }
 
 describe('webhooks.list()', () => {
-  it('sends GET /webhooks and returns array', async () => {
+  it('sends GET /webhooks and returns the unwrapped array', async () => {
     const payload = [makeWebhook()]
-    server.use(http.get(`${BASE}/webhooks`, () => HttpResponse.json(payload)))
+    server.use(http.get(`${BASE}/webhooks`, () => HttpResponse.json(wrap(payload))))
     const result = await makeClient().webhooks.list()
     expect(result).toEqual(payload)
   })
 })
 
 describe('webhooks.retrieve()', () => {
-  it('sends GET /webhooks/:id and returns webhook', async () => {
+  it('sends GET /webhooks/:id and returns the unwrapped webhook', async () => {
     const webhook = makeWebhook({ id: 'wh-123' })
-    server.use(http.get(`${BASE}/webhooks/wh-123`, () => HttpResponse.json(webhook)))
+    server.use(http.get(`${BASE}/webhooks/wh-123`, () => HttpResponse.json(wrap(webhook))))
     const result = await makeClient().webhooks.retrieve('wh-123')
     expect(result).toEqual(webhook)
   })
@@ -52,7 +57,7 @@ describe('webhooks.create()', () => {
     server.use(
       http.post(`${BASE}/webhooks`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(webhook, { status: 201 })
+        return HttpResponse.json(wrap(webhook), { status: 201 })
       }),
     )
     const result = await makeClient().webhooks.create({
@@ -73,7 +78,7 @@ describe('webhooks.create()', () => {
     server.use(
       http.post(`${BASE}/webhooks`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(makeWebhook(), { status: 201 })
+        return HttpResponse.json(wrap(makeWebhook()), { status: 201 })
       }),
     )
     await makeClient().webhooks.create({
@@ -91,7 +96,7 @@ describe('webhooks.update()', () => {
     server.use(
       http.patch(`${BASE}/webhooks/webhook-1`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json(updated)
+        return HttpResponse.json(wrap(updated))
       }),
     )
     const result = await makeClient().webhooks.update('webhook-1', { active: false })
@@ -106,7 +111,7 @@ describe('webhooks.remove()', () => {
     server.use(
       http.delete(`${BASE}/webhooks/webhook-1`, () => {
         deleteCalled = true
-        return new HttpResponse(null, { status: 204 })
+        return HttpResponse.json(wrap({ deleted: true }))
       }),
     )
     await makeClient().webhooks.remove('webhook-1')
@@ -115,15 +120,14 @@ describe('webhooks.remove()', () => {
 })
 
 describe('webhooks.test()', () => {
-  it('sends POST /webhooks/:id/test', async () => {
-    let testCalled = false
+  it('sends POST /webhooks/:id/test and returns { delivered, httpStatus }', async () => {
     server.use(
-      http.post(`${BASE}/webhooks/webhook-1/test`, () => {
-        testCalled = true
-        return new HttpResponse(null, { status: 204 })
-      }),
+      http.post(`${BASE}/webhooks/webhook-1/test`, () =>
+        HttpResponse.json(wrap({ delivered: true, httpStatus: 200 })),
+      ),
     )
-    await makeClient().webhooks.test('webhook-1')
-    expect(testCalled).toBe(true)
+    const result = await makeClient().webhooks.test('webhook-1')
+    expect(result.delivered).toBe(true)
+    expect(result.httpStatus).toBe(200)
   })
 })

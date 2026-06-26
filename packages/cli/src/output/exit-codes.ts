@@ -28,11 +28,22 @@ function matchesClass(error: unknown, className: string): boolean {
 }
 
 export function exitCodeFromError(error: unknown): ExitCode {
+  // An explicit numeric `exitCode` (e.g. attached by resolveAuth for missing/invalid
+  // credentials) takes precedence over class-name matching, so every command — not
+  // just the ones with a local wrapper — exits with the right code.
+  const attached = (error as { exitCode?: number } | null)?.exitCode
+  if (typeof attached === 'number' && Number.isInteger(attached) && attached >= 0) {
+    return attached as ExitCode
+  }
   if (matchesClass(error, 'AuthenticationError')) return EXIT_CODES.AUTH_ERROR
   if (matchesClass(error, 'ScopeError')) return EXIT_CODES.SCOPE_ERROR
   if (matchesClass(error, 'NotFoundError')) return EXIT_CODES.NOT_FOUND
   if (matchesClass(error, 'RateLimitError')) return EXIT_CODES.RATE_LIMITED
   if (matchesClass(error, 'ValidationError')) return EXIT_CODES.VALIDATION_ERROR
   if (matchesClass(error, 'NetworkError')) return EXIT_CODES.NETWORK_ERROR
+  // SDK transport failures are an AutopostingError carrying a string `code`, not a
+  // dedicated class — match on the code so timeouts/network drops map to exit 7.
+  const code = (error as { code?: unknown } | null)?.code
+  if (code === 'NETWORK_ERROR' || code === 'TIMEOUT') return EXIT_CODES.NETWORK_ERROR
   return EXIT_CODES.GENERAL_ERROR
 }

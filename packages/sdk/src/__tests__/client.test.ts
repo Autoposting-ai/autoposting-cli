@@ -11,7 +11,7 @@ import {
   ServerError,
 } from '../errors'
 
-const BASE = 'https://app.autoposting.ai'
+const BASE = 'https://app.autoposting.ai/api-proxy'
 
 const server = setupServer()
 

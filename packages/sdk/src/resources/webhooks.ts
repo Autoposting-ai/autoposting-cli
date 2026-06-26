@@ -6,6 +6,7 @@ export class WebhooksResource extends Resource {
     return this.get<Webhook[]>('/webhooks')
   }
 
+  // NOTE: the backend has no GET /webhooks/:id route — this 404s until front-back adds it.
   retrieve(id: string): Promise<Webhook> {
     return this.get<Webhook>(`/webhooks/${id}`)
   }
@@ -22,7 +23,8 @@ export class WebhooksResource extends Resource {
     return this.client.request<void>('DELETE', `/webhooks/${id}`)
   }
 
-  test(id: string): Promise<void> {
-    return this.post<void>(`/webhooks/${id}/test`)
+  // POST /webhooks/:id/test — backend returns `{ delivered, httpStatus }`.
+  test(id: string): Promise<{ delivered: boolean; httpStatus: number }> {
+    return this.post<{ delivered: boolean; httpStatus: number }>(`/webhooks/${id}/test`)
   }
 }

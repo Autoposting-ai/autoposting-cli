@@ -24,8 +24,14 @@ export type {
   KbDocument,
   CreateKbParams,
   SearchResult,
+  Citation,
+  IdeaPlatform,
   Idea,
   GenerateIdeasParams,
+  GeneratedIdea,
+  GenerateIdeasResult,
+  EnrichPlatform,
+  EnrichIdeaParams,
 } from './types/kb'
 export {
   AutopostingError,
@@ -37,5 +43,5 @@ export {
   ServerError,
 } from './errors'
 export { Resource } from './resource'
-export type { Platform, PaginatedResponse, ApiResponse } from './types'
+export type { Platform, Paginated, ApiResponse } from './types'
 export { VERSION } from './version'

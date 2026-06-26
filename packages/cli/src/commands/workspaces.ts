@@ -31,13 +31,13 @@ export function createWorkspacesCommand(): Command {
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        const list = await client.workspaces.list()
+        const res = await client.workspaces.list()
         spinner.stop()
-        const rows = list.map((w) => ({
+        const rows = res.organizations.map((w) => ({
           id: w.id,
           name: w.name,
           slug: w.slug,
-          active: w.isActive ? 'yes' : 'no',
+          active: w.id === res.activeOrgId ? 'yes' : 'no',
           createdAt: w.createdAt,
         }))
         printer.table(rows, ['id', 'name', 'slug', 'active', 'createdAt'])

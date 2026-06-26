@@ -151,8 +151,39 @@ describe('ap ideas delete', () => {
 
 describe('ap ideas enrich', () => {
   it('exits with auth error (code 2) when no API key is set', async () => {
-    const result = await ap(['ideas', 'enrich', 'idea-123'])
+    const result = await ap([
+      'ideas',
+      'enrich',
+      '--title',
+      'The future of AI',
+      '--hook',
+      'AI eats marketing',
+      '--angle',
+      'contrarian',
+      '--platforms',
+      'twitter,linkedin',
+    ])
     expect(result.exitCode).toBe(2)
     expect(result.stderr).toMatch(/No API key found/)
+  })
+
+  it('rejects an unsupported platform with a validation error', async () => {
+    const result = await ap(
+      [
+        'ideas',
+        'enrich',
+        '--title',
+        't',
+        '--hook',
+        'h',
+        '--angle',
+        'a',
+        '--platforms',
+        'x',
+      ],
+      { AUTOPOSTING_API_KEY: 'sk-test' },
+    )
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stderr).toMatch(/Unsupported platform/)
   })
 })

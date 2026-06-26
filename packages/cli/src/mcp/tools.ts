@@ -441,13 +441,27 @@ export const ALL_TOOLS: Tool[] = [
   },
   {
     name: 'enrich-idea',
-    description: 'Enrich an idea with additional AI-generated context.',
+    description:
+      'Enrich an idea (title/hook/angle) into platform-ready drafts across 1..5 platforms. Async — returns a job ID.',
     inputSchema: {
       type: 'object',
       properties: {
-        id: { type: 'string', description: 'Idea ID to enrich' },
+        title: { type: 'string', description: 'Idea title' },
+        hook: { type: 'string', description: 'Idea hook' },
+        angle: { type: 'string', description: 'Idea angle' },
+        platforms: {
+          type: 'array',
+          description: 'Target platforms (1..5)',
+          items: {
+            type: 'string',
+            enum: ['twitter', 'linkedin', 'instagram', 'youtube', 'threads'],
+          },
+          minItems: 1,
+          maxItems: 5,
+        },
+        kbId: { type: 'string', description: 'Optional knowledge base ID for context' },
       },
-      required: ['id'],
+      required: ['title', 'hook', 'angle', 'platforms'],
       additionalProperties: false,
     },
   },

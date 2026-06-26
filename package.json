@@ -8,7 +8,7 @@
   "scripts": {
     "build": "turbo build",
     "test": "turbo test",
-    "test:regression": "npm run typecheck && npm run build && npm test && npm run pack:smoke && npm audit --audit-level=moderate",
+    "test:regression": "npm run typecheck && npm run build && npm test && npm run pack:smoke && npm audit --omit=dev --audit-level=moderate",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "pack:smoke": "node scripts/pack-smoke.mjs",

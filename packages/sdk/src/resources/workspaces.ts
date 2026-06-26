@@ -7,8 +7,12 @@ export class WorkspacesResource extends Resource {
     super(client)
   }
 
-  list(): Promise<Workspace[]> {
-    return this.get<Workspace[]>('/orgs')
+  /**
+   * GET /orgs — backend returns `{ organizations, activeOrgId }`, not a bare array.
+   * NOTE: this route is session-only (better-auth session); an API key receives 401.
+   */
+  list(): Promise<{ organizations: Workspace[]; activeOrgId: string }> {
+    return this.get<{ organizations: Workspace[]; activeOrgId: string }>('/orgs')
   }
 
   switchWorkspace(id: string): Promise<void> {
@@ -21,6 +25,6 @@ export class WorkspacesResource extends Resource {
         ),
       )
     }
-    return this.post<void>('/orgs/set-active', { organizationId: id })
+    return this.client.request<void>('PUT', '/orgs/active', { organizationId: id })
   }
 }

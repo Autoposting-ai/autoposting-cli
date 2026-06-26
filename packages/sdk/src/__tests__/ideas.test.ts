@@ -2,17 +2,34 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
-import type { Idea } from '../types/kb'
+import type { Idea, GeneratedIdea } from '../types/kb'
 
-const BASE = 'https://app.autoposting.ai'
+const BASE = 'https://app.autoposting.ai/api-proxy'
 
 const mockIdea: Idea = {
   id: 'idea-1',
-  text: 'Write about the future of AI in marketing',
-  topic: 'AI',
   kbId: 'kb-1',
-  enriched: false,
+  topic: 'AI',
+  title: 'The future of AI in marketing',
+  hook: 'AI is quietly eating marketing',
+  angle: 'contrarian',
+  targetPlatform: 'linkedin',
+  viralityScore: 87,
+  citations: [],
+  status: 'new',
+  source: 'kb',
   createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+}
+
+const mockGeneratedIdea: GeneratedIdea = {
+  id: 'idea-1',
+  title: 'The future of AI in marketing',
+  hook: 'AI is quietly eating marketing',
+  angle: 'contrarian',
+  targetPlatform: 'linkedin',
+  viralityScore: 87,
+  citations: [],
 }
 
 const server = setupServer()
@@ -21,30 +38,39 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
+// Every backend success response is wrapped as { success: true, data: <payload> }.
+// The SDK unwraps it, so mocks must wrap and assertions check the unwrapped payload.
+function wrap<T>(data: T) {
+  return { success: true, data }
+}
+
 function makeClient() {
   return new Autoposting({ apiKey: 'test-key' })
 }
 
 describe('ideas.generate()', () => {
-  it('sends POST /ideas/generate with params and returns ideas', async () => {
+  it('sends POST /ideas/generate-topic and returns the result object (ideas in .ideas)', async () => {
+    const payload = { ideas: [mockGeneratedIdea], source: 'topic', topic: 'AI' }
     let capturedBody: unknown = null
     server.use(
-      http.post(`${BASE}/ideas/generate`, async ({ request }) => {
+      http.post(`${BASE}/ideas/generate-topic`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json([mockIdea], { status: 201 })
+        return HttpResponse.json(wrap(payload), { status: 200 })
       }),
     )
     const result = await makeClient().ideas.generate({ kbId: 'kb-1', topic: 'AI', count: 5 })
     expect(capturedBody).toEqual({ kbId: 'kb-1', topic: 'AI', count: 5 })
-    expect(result).toEqual([mockIdea])
+    expect(result.ideas).toEqual([mockGeneratedIdea])
+    expect(result.source).toBe('topic')
+    expect(result.topic).toBe('AI')
   })
 
-  it('sends POST /ideas/generate with empty body when no params provided', async () => {
+  it('sends POST /ideas/generate-topic with empty body when no params provided', async () => {
     let capturedBody: unknown = null
     server.use(
-      http.post(`${BASE}/ideas/generate`, async ({ request }) => {
+      http.post(`${BASE}/ideas/generate-topic`, async ({ request }) => {
         capturedBody = await request.json()
-        return HttpResponse.json([mockIdea])
+        return HttpResponse.json(wrap({ ideas: [mockGeneratedIdea], source: 'topic', topic: 'AI' }))
       }),
     )
     await makeClient().ideas.generate()
@@ -53,21 +79,31 @@ describe('ideas.generate()', () => {
 })
 
 describe('ideas.list()', () => {
-  it('sends GET /ideas and returns array', async () => {
-    server.use(http.get(`${BASE}/ideas`, () => HttpResponse.json([mockIdea])))
+  it('sends GET /ideas and returns the paginated envelope (items/total/limit/offset)', async () => {
+    const payload = { items: [mockIdea], total: 1, limit: 100, offset: 0 }
+    server.use(http.get(`${BASE}/ideas`, () => HttpResponse.json(wrap(payload))))
     const result = await makeClient().ideas.list()
-    expect(result).toEqual([mockIdea])
+    expect(result.items).toEqual([mockIdea])
+    expect(result.total).toBe(1)
+    expect(result.limit).toBe(100)
+    expect(result.offset).toBe(0)
   })
 })
 
 describe('ideas.enrich()', () => {
-  it('sends POST /ideas/:id/enrich and returns enriched idea', async () => {
-    const enriched = { ...mockIdea, enriched: true }
+  it('sends POST /ideas/enrich with idea + platforms and returns the job id', async () => {
+    let capturedBody: unknown = null
     server.use(
-      http.post(`${BASE}/ideas/idea-1/enrich`, () => HttpResponse.json(enriched)),
+      http.post(`${BASE}/ideas/enrich`, async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json(wrap({ jobId: 'job-1' }), { status: 202 })
+      }),
     )
-    const result = await makeClient().ideas.enrich('idea-1')
-    expect(result.enriched).toBe(true)
+    const idea = { title: 'The future of AI', hook: 'AI eats marketing', angle: 'contrarian' }
+    const platforms = [{ platform: 'twitter' as const }, { platform: 'linkedin' as const }]
+    const result = await makeClient().ideas.enrich({ idea, platforms })
+    expect(capturedBody).toEqual({ idea, platforms })
+    expect(result.jobId).toBe('job-1')
   })
 })
 
@@ -77,7 +113,7 @@ describe('ideas.remove()', () => {
     server.use(
       http.delete(`${BASE}/ideas/idea-1`, () => {
         deleteCalled = true
-        return new HttpResponse(null, { status: 204 })
+        return HttpResponse.json(wrap({ id: 'idea-1' }))
       }),
     )
     await makeClient().ideas.remove('idea-1')
