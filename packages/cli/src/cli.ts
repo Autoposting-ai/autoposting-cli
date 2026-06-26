@@ -19,6 +19,7 @@ import { createOpenCommand } from './commands/open.js'
 import { createUpdateCommand } from './commands/update.js'
 import { createCompletionCommand } from './commands/completion.js'
 import { createMcpCommand } from './commands/mcp.js'
+import { createConfigCommand } from './commands/config.js'
 import { disableColor } from './output/index.js'
 
 const program = new Command()
@@ -27,7 +28,8 @@ const program = new Command()
   .version(VERSION)
   .option('--json', 'Output as JSON')
   .option('--quiet', 'Suppress spinners and non-essential output')
-  .option('--format <type>', 'Output format: table, json', 'table')
+  .option('--format <type>', 'Output format: auto (table on a terminal, JSON when piped), table, json', 'auto')
+  .option('--jq <expr>', 'Filter JSON output with a minimal jq expression (e.g. ".[].id")')
   .option('--api-key <key>', 'API key (overrides env/stored credentials)')
   .option('--no-color', 'Disable color output')
   .hook('preAction', (thisCommand) => {
@@ -53,5 +55,6 @@ program.addCommand(createOpenCommand())
 program.addCommand(createUpdateCommand())
 program.addCommand(createCompletionCommand())
 program.addCommand(createMcpCommand())
+program.addCommand(createConfigCommand())
 
 program.parse()

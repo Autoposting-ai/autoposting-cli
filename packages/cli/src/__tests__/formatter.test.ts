@@ -47,6 +47,25 @@ describe('detectOutputMode', () => {
     const opts: OutputOptions = { quiet: true, json: true }
     expect(detectOutputMode(opts)).toBe('quiet')
   })
+
+  // M2 — auto default: detect by TTY when no explicit format is given.
+  it("format 'auto' + TTY → tty", () => {
+    expect(detectOutputMode({ format: 'auto' })).toBe('tty')
+  })
+
+  it("format 'auto' + non-TTY → json", () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true })
+    expect(detectOutputMode({ format: 'auto' })).toBe('json')
+  })
+
+  it("explicit format 'table' + non-TTY → still tty (override honored)", () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true })
+    expect(detectOutputMode({ format: 'table' })).toBe('tty')
+  })
+
+  it("explicit format 'json' + TTY → json", () => {
+    expect(detectOutputMode({ format: 'json' })).toBe('json')
+  })
 })
 
 describe('formatOutput', () => {

@@ -92,8 +92,15 @@ ap posts create --brand my-brand --text "Ship day 🚀" --platforms x \
   --media chart.png demo.mp4 --alt-text "Q2 chart"
 
 # Pick a specific account when a brand has several of one platform
+# (or =all to fan out to every connected account — prints the resolved count)
 ap posts create --brand my-brand --text "Update" --platforms linkedin \
   --account linkedin=@acme-corp
+
+# Preview the resolved request without uploading or posting
+ap posts create --brand my-brand --text "Preview me" --platforms x --dry-run
+
+# Bulk create — one post per row from a JSON array or CSV
+ap posts create --from posts.csv
 
 # Schedule it (or --cancel to unschedule back to draft)
 ap posts schedule <post-id> --at "2025-01-15T09:00:00Z"
@@ -101,6 +108,13 @@ ap posts schedule <post-id> --cancel
 
 # Or publish immediately
 ap posts publish <post-id>
+```
+
+Set a default brand once to drop `--brand` from `posts` commands:
+
+```bash
+ap config set-context --brand my-brand
+ap posts create --text "No --brand needed" --platforms x
 ```
 
 ### 3. Check Your Setup
@@ -121,7 +135,7 @@ ap brands list    # list all brands in your workspace
 |---------|-------------|
 | `ap posts list` | List posts (filter by brand, status, page) |
 | `ap posts get <id>` | Get a post by ID |
-| `ap posts create` | Create a draft (supports media, per-platform text/options, account selector) |
+| `ap posts create` | Create a draft (media, per-platform text/options, account selector; `--dry-run` to preview; `--from <file>` for bulk) |
 | `ap posts update <id>` | Update text, platforms, or schedule |
 | `ap posts delete <id>` | Delete a post (requires `--force`) |
 | `ap posts publish <id>` | Publish immediately |
@@ -140,6 +154,15 @@ ap brands list    # list all brands in your workspace
 | `ap brands update <slug>` | Update name or timezone |
 | `ap brands delete <slug>` | Delete a brand (requires `--force`) |
 | `ap brands auth-status <slug>` | Show platform connection status |
+| `ap brands set-default-account <slug> <p=handle\|all...>` | Save default target account(s) per platform (also `get`/`clear`) |
+
+### Config
+
+| Command | Description |
+|---------|-------------|
+| `ap config set-context --brand <slug>` | Set a default brand so `--brand` can be omitted |
+| `ap config get-context` | Show the default brand |
+| `ap config unset-context` | Clear the default brand |
 
 ### Agents
 
@@ -245,7 +268,8 @@ ap brands list    # list all brands in your workspace
 | `--api-key <key>` | Override API key for this command |
 | `--json` | Output as JSON (for piping) |
 | `--quiet` | Suppress spinners and non-essential output |
-| `--format <type>` | Output format: `table` or `json` |
+| `--format <type>` | Output format: `auto` (default), `table`, or `json` |
+| `--jq <expr>` | Filter JSON output with a built-in minimal jq (no external `jq` needed) |
 | `--no-color` | Disable color output |
 
 ### Auth Priority Chain
@@ -258,8 +282,9 @@ ap brands list    # list all brands in your workspace
 
 | Context | Behavior |
 |---------|----------|
-| TTY (interactive) | Formatted tables, spinners, colors |
-| Piped / `--json` | Clean JSON output |
+| Auto (default) | Table on an interactive terminal, JSON when piped or non-interactive |
+| `--format table` | Formatted tables, spinners, colors |
+| Piped / `--json` / `--format json` | Clean JSON output |
 | `--quiet` | Suppress spinners, errors only |
 
 ---

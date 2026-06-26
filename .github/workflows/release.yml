@@ -32,6 +32,15 @@ jobs:
           fi
       - run: npm run typecheck
       - run: npm run build
+      - name: Verify built binary prints the release version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          BIN_VER=$(node packages/cli/dist/cli.cjs --version)
+          echo "Tag: $TAG | Built binary: $BIN_VER"
+          if [ "$TAG" != "$BIN_VER" ]; then
+            echo "::error::Built CLI binary reports $BIN_VER but the release tag is v$TAG"
+            exit 1
+          fi
       - run: npm test
       - run: npm run pack:smoke
       # Audit shipped deps only — dev-only tooling (changesets) vulns never reach the published tarball.

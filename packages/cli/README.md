@@ -71,6 +71,9 @@ ap posts create --brand my-brand --text "Launch day!" --platforms x,linkedin,thr
 ap posts create --brand my-brand --text "Tweet 1" --thread "Tweet 2" "Tweet 3" --platforms x   # multi-tweet thread (X/Threads, max 25)
 ap posts create --brand my-brand --text "Ship day 🚀" --platforms x --media chart.png demo.mp4 --alt-text "Q2 chart"   # attach media (alt text aligns by index)
 ap posts create --brand my-brand --text "Update" --platforms linkedin --account linkedin=@acme-corp   # pick one of several accounts on a platform
+ap posts create --brand my-brand --text "Update" --platforms linkedin --account linkedin=all   # fan out to every connected account (prints the count)
+ap posts create --brand my-brand --text "Preview me" --platforms x --dry-run   # print the resolved request without uploading or posting
+ap posts create --from posts.csv                # bulk create one post per row (CSV or JSON array)
 ap posts schedule <id> --at "2025-06-01T09:00:00Z"
 ap posts schedule <id> --cancel                # unschedule, back to draft
 ap posts publish <id>
@@ -97,6 +100,11 @@ ap clips render <id>
 ap brands list
 ap brands auth-status my-brand   # check platform connections
 ap brands create --name "My Brand" --timezone "America/New_York"
+ap brands set-default-account my-brand x=@main linkedin=all   # default target per platform when --account is omitted
+
+# Config — default brand context (drop --brand on posts commands)
+ap config set-context --brand my-brand
+ap config get-context
 
 # Agents — AI-powered automated posting
 ap agents create --name "Daily News" --type publish --frequency daily --time "09:00"
@@ -201,9 +209,12 @@ All tools use correct domain terminology (`brandSlug`, `text`) — no translatio
 
 | Mode | When | Format |
 |------|------|--------|
-| Interactive | TTY terminal | Tables, spinners, colors |
-| JSON | `--json` or piped | Clean JSON for parsing |
+| Auto (default) | — | Table on a TTY, JSON when piped or non-interactive |
+| Interactive | `--format table` | Tables, spinners, colors |
+| JSON | `--json`, `--format json`, or piped | Clean JSON for parsing |
 | Quiet | `--quiet` | Errors only, no spinners |
+
+Shape JSON inline with the built-in `--jq <expr>` filter (no external `jq` needed), e.g. `ap posts list --jq '.[].id'`.
 
 ### Exit Codes
 
@@ -226,7 +237,8 @@ All tools use correct domain terminology (`brandSlug`, `text`) — no translatio
 | `--api-key <key>` | Override API key |
 | `--json` | JSON output |
 | `--quiet` | Suppress non-essential output |
-| `--format <type>` | `table` or `json` |
+| `--format <type>` | `auto` (default), `table`, or `json` |
+| `--jq <expr>` | Filter JSON output with a built-in minimal jq |
 | `--no-color` | Disable colors |
 
 ### Auth Priority

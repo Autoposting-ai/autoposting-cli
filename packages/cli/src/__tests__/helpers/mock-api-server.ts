@@ -65,6 +65,19 @@ export async function startMockApi(opts: { accounts?: MockAccount[] } = {}): Pro
       }
 
       if (req.method === 'GET' && url.includes('/auth/status')) return send(accounts)
+      if (req.method === 'GET' && /\/posts(\?.*)?$/.test(url)) {
+        return send([
+          {
+            id: 'post-1', brandSlug: 'my-brand', text: 'First', platforms: ['x'],
+            status: 'scheduled', scheduledAt: '2026-07-01T10:00:00Z',
+            createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+          },
+          {
+            id: 'post-2', brandSlug: 'my-brand', text: 'Second', platforms: ['x', 'linkedin'],
+            status: 'draft', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+          },
+        ])
+      }
       if (req.method === 'POST' && url.endsWith('/media/upload')) return send(UPLOADED)
       if (req.method === 'PUT' && /\/posts\/[^/]+\/schedule$/.test(url)) {
         const cancel = (jsonBody as { cancel?: boolean } | undefined)?.cancel === true

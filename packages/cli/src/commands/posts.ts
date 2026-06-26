@@ -1,26 +1,12 @@
 import { Command } from 'commander'
 import { Autoposting, NotFoundError } from '@autoposting.ai/sdk'
-import type { Platform } from '@autoposting.ai/sdk'
-import fs from 'node:fs/promises'
-import nodePath from 'node:path'
 import { resolveAuth } from '../auth/auth-manager.js'
 import { createPrinter } from '../output/printer.js'
 import type { Spinner } from '../output/spinner.js'
 import { exitCodeFromError } from '../output/exit-codes.js'
-import {
-  extToMime,
-  parsePairs,
-  parsePlatformMediaPairs,
-  validateMediaCount,
-  validateMediaPaths,
-  validateMediaExtensions,
-  alignAltText,
-  buildYoutubeOptions,
-  buildInstagramOptions,
-  buildThreadsOptions,
-} from '../lib/media-flags.js'
-import type { MediaInput } from '@autoposting.ai/sdk'
-import { resolveTargetAccounts } from '../lib/account-select.js'
+import { parsePlatforms, validateScheduledAt, buildAndCreatePost } from '../lib/post-create.js'
+import { parseBulkFile, createPostsBulk } from '../lib/post-bulk.js'
+import { resolveBrand } from '../auth/config-store.js'
 
 type GlobalOpts = {
   apiKey?: string
@@ -29,48 +15,12 @@ type GlobalOpts = {
   format?: 'table' | 'json'
 }
 
-const VALID_PLATFORMS: readonly Platform[] = ['x', 'linkedin', 'instagram', 'threads', 'youtube']
-
-function parsePlatforms(raw: string): Platform[] {
-  const parts = raw.split(',').map((p) => p.trim()).filter(Boolean)
-  if (parts.length === 0) {
-    throw new Error('No platforms provided. Pass a comma-separated list, e.g. --platforms x,linkedin')
-  }
-  const invalid = parts.filter((p) => !VALID_PLATFORMS.includes(p as Platform))
-  if (invalid.length > 0) {
-    throw new Error(
-      `Unsupported platform(s): ${invalid.join(', ')}. Valid platforms: ${VALID_PLATFORMS.join(', ')}`,
-    )
-  }
-  return parts as Platform[]
-}
-
 function parsePositiveInt(value: string, flag: string): number {
   const n = Number(value)
   if (!Number.isInteger(n) || n < 1) {
     throw new Error(`${flag} must be a positive integer (received "${value}").`)
   }
   return n
-}
-
-function validateScheduledAt(value: string): string {
-  // Require a real ISO 8601 datetime. Date.parse alone is lenient (accepts locale formats
-  // like "01/02/2026"), so also require the YYYY-MM-DDTHH:MM prefix the API expects.
-  const ms = Date.parse(value)
-  if (Number.isNaN(ms) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
-    throw new Error(
-      `--at must be a valid ISO 8601 datetime, e.g. 2026-06-30T14:00:00Z (received "${value}").`,
-    )
-  }
-  // A past time means the post would publish immediately on submit — almost never intended,
-  // and irreversible for an instant publish. Reject it here, before any create/schedule call.
-  if (ms <= Date.now()) {
-    throw new Error(
-      `--at must be in the future (received "${value}", which is in the past). ` +
-        `A past schedule time publishes immediately.`,
-    )
-  }
-  return value
 }
 
 /**
@@ -91,7 +41,7 @@ export function createPostsCommand(): Command {
   posts
     .command('list')
     .description('List posts')
-    .option('--brand <slug>', 'Filter by brand slug')
+    .option('--brand <slug>', 'Filter by brand slug (defaults to the saved context)')
     .option('--status <status>', 'Filter by status (draft|scheduled|published|failed)')
     .option('--limit <n>', 'Max results per page', '20')
     .option('--page <n>', 'Page number', '1')
@@ -103,7 +53,7 @@ export function createPostsCommand(): Command {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
         const result = await client.posts.list({
-          brandSlug: opts.brand,
+          brandSlug: resolveBrand(opts.brand) ?? undefined,
           status: opts.status as 'draft' | 'scheduled' | 'published' | 'failed' | undefined,
           limit: parsePositiveInt(opts.limit, '--limit'),
           page: parsePositiveInt(opts.page, '--page'),
@@ -150,9 +100,12 @@ export function createPostsCommand(): Command {
   posts
     .command('create')
     .description('Create a new post')
-    .requiredOption('--brand <slug>', 'Brand slug')
-    .requiredOption('--text <text>', 'Post text content')
-    .requiredOption('--platforms <list>', 'Comma-separated platforms (e.g. x,linkedin)')
+    .option('--brand <slug>', 'Brand slug (defaults to the saved context: ap config set-context)')
+    // Not requiredOption: --from supplies text/platforms per row. Required-ness for
+    // the single-post path is enforced manually below so --from can omit them.
+    .option('--text <text>', 'Post text content (required unless --from)')
+    .option('--platforms <list>', 'Comma-separated platforms, e.g. x,linkedin (required unless --from)')
+    .option('--from <file>', 'Create posts in bulk from a CSV or JSON file (one post per row)')
     .option('--at <iso>', 'Schedule date/time (ISO 8601)')
     .option(
       '--thread <text...>',
@@ -181,12 +134,16 @@ export function createPostsCommand(): Command {
     .option('--threads-reply-control <v>', 'Threads reply control (everyone|accounts_you_follow|mentioned_only)')
     // v0.3.3 — account selector
     .option('--account <p=handle|id...>', 'Target specific account per platform, e.g. x=@handle')
+    // v0.3.4 — preview the resolved request without uploading or posting
+    .option('--dry-run', 'Print the resolved request body without uploading media or creating the post')
+    .option('--preview', 'Alias for --dry-run')
     .action(
       async (
         opts: {
-          brand: string
-          text: string
-          platforms: string
+          brand?: string
+          text?: string
+          platforms?: string
+          from?: string
           at?: string
           thread?: string[]
           // v0.3.3
@@ -208,141 +165,77 @@ export function createPostsCommand(): Command {
           threadsReplyTo?: string
           threadsReplyControl?: string
           account?: string[]
+          dryRun?: boolean
+          preview?: boolean
         },
         cmd: Command,
       ) => {
         const globals = cmd.optsWithGlobals<GlobalOpts>()
         const printer = createPrinter(globals)
-        // Spinner is started only after the account picker (see below) — ora's
+        // Spinner is started only after the account picker (via onBeforeNetwork) — ora's
         // repaint loop fights the interactive prompt and can obscure the selection.
         let spinner: Spinner | undefined
         try {
           const cred = resolveAuth({ apiKey: globals.apiKey })
           const client = new Autoposting({ apiKey: cred.apiKey })
 
-          // ── Pure validation pass (all synchronous/disk-only) ──────────────
-          // Must run before any network call so errors are clear and fast.
-          const platforms = parsePlatforms(opts.platforms)
-          const scheduledAt = opts.at ? validateScheduledAt(opts.at) : undefined
-
-          if (opts.media && opts.media.length > 0) {
-            validateMediaCount(opts.media)
-            validateMediaPaths(opts.media)
-            validateMediaExtensions(opts.media)
-          }
-
-          const platformTexts =
-            opts.platformText && opts.platformText.length > 0
-              ? parsePairs('--platform-text', opts.platformText)
-              : undefined
-
-          // Parse platform-media pairs up front (validate format + paths before upload).
-          const platformMediaPaths =
-            opts.platformMedia && opts.platformMedia.length > 0
-              ? parsePlatformMediaPairs('--platform-media', opts.platformMedia)
-              : {}
-          for (const paths of Object.values(platformMediaPaths)) {
-            validateMediaPaths(paths)
-            validateMediaExtensions(paths)
-          }
-
-          // Validate alt-text count against media count before any upload.
-          const altTexts = alignAltText(opts.media ?? [], opts.altText ?? [])
-
-          const youtubeOptions = buildYoutubeOptions({
-            ytTitle: opts.ytTitle,
-            ytDescription: opts.ytDescription,
-            ytTags: opts.ytTags,
-            ytPrivacy: opts.ytPrivacy,
-            ytCategory: opts.ytCategory,
-            ytMadeForKids: opts.ytMadeForKids,
-          })
-          const instagramOptions = buildInstagramOptions({
-            igReel: opts.igReel,
-            igShareToFeed: opts.igShareToFeed,
-            igCoverUrl: opts.igCoverUrl,
-            igThumbOffsetMs: opts.igThumbOffsetMs,
-            igCollaborators: opts.igCollaborators,
-          })
-          const threadsOptions = buildThreadsOptions({
-            threadsReplyTo: opts.threadsReplyTo,
-            threadsReplyControl: opts.threadsReplyControl,
-          })
-
-          // ── Network calls ─────────────────────────────────────────────────
-          const targetAccountIds = await resolveTargetAccounts({
-            brandSlug: opts.brand,
-            platforms,
-            accountFlags: opts.account ?? [],
-            client,
-            // Picker reads stdin — gate on a real interactive terminal, not the
-            // output mode (printer.isTty() is true even when stdout/stdin is piped).
-            isTty: Boolean(process.stdin.isTTY),
-          })
-
-          // Picker done — safe to animate the spinner now (covers uploads + create).
-          spinner = printer.spinner('Creating post…')
-
-          // Upload global media.
-          const mediaInputs: MediaInput[] = []
-          for (let i = 0; i < (opts.media ?? []).length; i++) {
-            const filePath = opts.media![i]
-            const data = await fs.readFile(filePath)
-            const filename = nodePath.basename(filePath)
-            const contentType = extToMime(filename)
-            const uploaded = await client.media.upload({
-              data: new Uint8Array(data),
-              filename,
-              contentType,
+          // ── Bulk path: --from <file> creates one post per row ──────────────
+          if (opts.from) {
+            const rows = parseBulkFile(opts.from)
+            const records = await createPostsBulk(client, rows, {
+              cliBrand: resolveBrand(opts.brand) ?? undefined,
             })
-            mediaInputs.push({
-              url: uploaded.url,
-              type: uploaded.type,
-              ...(altTexts[i] ? { altText: altTexts[i] } : {}),
-            })
-          }
-
-          // Upload per-platform media.
-          const platformMediaResult: Partial<Record<Platform, MediaInput[]>> = {}
-          for (const [p, paths] of Object.entries(platformMediaPaths) as [Platform, string[]][]) {
-            const uploads: MediaInput[] = []
-            for (const filePath of paths) {
-              const data = await fs.readFile(filePath)
-              const filename = nodePath.basename(filePath)
-              const contentType = extToMime(filename)
-              const uploaded = await client.media.upload({
-                data: new Uint8Array(data),
-                filename,
-                contentType,
-              })
-              uploads.push({ url: uploaded.url, type: uploaded.type })
+            // Truncate text only for the human table; JSON/jq/quiet keep it full
+            // (lossless echo for scripting consumers).
+            const truncate = printer.isTty()
+            printer.table(
+              records.map((r) => ({
+                '#': r.index + 1,
+                status: r.status,
+                id: r.id || '—',
+                text: truncate && r.text.length > 40 ? `${r.text.slice(0, 37)}…` : r.text,
+                error: r.error,
+              })),
+              ['#', 'status', 'id', 'text', 'error'],
+            )
+            if (records.some((r) => r.status === 'failed')) {
+              process.exit(1)
             }
-            platformMediaResult[p] = uploads
+            return
           }
 
-          const post = await client.posts.create({
-            brandSlug: opts.brand,
-            text: opts.text,
-            platforms,
-            ...(scheduledAt ? { scheduledAt } : {}),
-            ...(opts.thread && opts.thread.length > 0 ? { thread: opts.thread } : {}),
-            ...(mediaInputs.length > 0 ? { media: mediaInputs } : {}),
-            ...(Object.keys(platformMediaResult).length > 0
-              ? { platformMedia: platformMediaResult }
-              : {}),
-            ...(platformTexts && Object.keys(platformTexts).length > 0
-              ? { platformTexts }
-              : {}),
-            ...(Object.keys(targetAccountIds).length > 0
-              ? { targetAccountIds }
-              : {}),
-            ...(instagramOptions ? { instagramOptions } : {}),
-            ...(threadsOptions ? { threadsOptions } : {}),
-            ...(youtubeOptions ? { youtubeOptions } : {}),
-            source: 'cli',
-          })
-          spinner.stop()
-          printer.log(post)
+          // Resolve the brand before any validation so a missing brand fails first.
+          const brand = resolveBrand(opts.brand)
+          if (!brand) {
+            throw new Error(
+              'No brand specified. Pass --brand <slug> or set a default with: ap config set-context --brand <slug>',
+            )
+          }
+          if (!opts.text) {
+            throw new Error('--text is required (or use --from <file> to create posts in bulk).')
+          }
+          if (!opts.platforms) {
+            throw new Error('--platforms is required (or use --from <file> to create posts in bulk).')
+          }
+
+          const result = await buildAndCreatePost(
+            client,
+            { ...opts, brandSlug: brand, text: opts.text, platforms: opts.platforms },
+            {
+              // Picker reads stdin — gate on a real interactive terminal, not the
+              // output mode (printer.isTty() is true even when stdin is piped).
+              isTty: Boolean(process.stdin.isTTY),
+              // --dry-run/--preview: resolve + validate, then return the request body
+              // without uploading media or POSTing (onBeforeNetwork never fires).
+              dryRun: Boolean(opts.dryRun || opts.preview),
+              // Picker done — start the spinner now (covers uploads + create).
+              onBeforeNetwork: () => {
+                spinner = printer.spinner('Creating post…')
+              },
+            },
+          )
+          spinner?.stop()
+          printer.log(result)
         } catch (err) {
           spinner?.fail()
           printer.error(err as Error)
@@ -410,7 +303,8 @@ export function createPostsCommand(): Command {
         // A failed delete (after the SDK's transient-retry gives up) may have left the
         // post in place — a NotFound means it's already gone, anything else is ambiguous.
         // Tell the user to verify so a still-scheduled post isn't silently orphaned.
-        if (!(err instanceof NotFoundError) && printer.isTty()) {
+        // Goes to stderr in every mode — a CI/piped run needs this safety hint too.
+        if (!(err instanceof NotFoundError)) {
           printer.error(`The post may not have been deleted — verify with: ap posts get "${id}"`)
         }
         process.exit(resolveExitCode(err))
