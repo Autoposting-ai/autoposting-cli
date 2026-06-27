@@ -1,5 +1,15 @@
 # @autoposting.ai/sdk
 
+## 0.3.5
+
+### Patch Changes
+
+- clips upload: stream local video files to a clip via multipart presigned upload
+  - **SDK** — `clips.upload()` drives the full backend flow: init → presigned part URLs → direct `PUT` to storage → complete, with best-effort multipart abort on failure. Reads are chunked (5 GB-safe), part size auto-clamps (5 MB min / 10k-part max), and the presigned `PUT` never carries the API bearer token.
+  - **CLI** — `ap clips upload <file> [--brand <id>] [--name <name>]` uploads a local video as a clip. The brand auto-resolves when the workspace has exactly one; with zero or many it asks for `--brand <id>`. `--name` overrides the clip title (defaults to the filename).
+
+  Requires the backend `POST /clips/upload/init` fix (org-scoped clips no longer require a userId) shipped in autoposting-front-back, now live on production.
+
 ## 0.3.4
 
 ## 0.3.3
