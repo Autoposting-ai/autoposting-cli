@@ -79,3 +79,18 @@ describe('ap clips delete', () => {
     expect(result.stderr).toMatch(/--force/)
   })
 })
+
+describe('ap clips upload', () => {
+  it('exposes --brand and --name options', async () => {
+    const result = await ap(['clips', 'upload', '--help'])
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('--brand')
+    expect(result.stdout).toContain('--name')
+  })
+
+  it('exits with auth error (code 2) when no API key is set', async () => {
+    const result = await ap(['clips', 'upload', '/tmp/none.mp4'])
+    expect(result.exitCode).toBe(2)
+    expect(result.stderr).toMatch(/No API key found/)
+  })
+})
