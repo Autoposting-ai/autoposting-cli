@@ -17,6 +17,22 @@ function resolveExitCode(err: unknown): number {
   return exitCodeFromError(err)
 }
 
+/**
+ * Resolve the brand for an upload: use --brand if given, else auto-pick when the
+ * workspace has exactly one brand. Zero or many brands → ask the user to pass --brand.
+ */
+async function resolveBrandId(client: Autoposting, explicit?: string): Promise<string> {
+  if (explicit) return explicit
+  const brands = await client.brands.list()
+  if (brands.length === 1) return brands[0].id
+  if (brands.length === 0) {
+    throw new Error('No brands found. Create a brand first, then pass --brand <id>.')
+  }
+  throw new Error(
+    `Multiple brands found — pass --brand <id>. Available: ${brands.map((b) => `${b.name} (${b.id})`).join(', ')}`,
+  )
+}
+
 export function createClipsCommand(): Command {
   const clips = new Command('clips').description('Manage video clips')
 
@@ -68,20 +84,23 @@ export function createClipsCommand(): Command {
       }
     })
 
-  // ap clips upload <file> [--name <name>]
+  // ap clips upload <file> [--brand <id>] [--name <name>]
   clips
     .command('upload <file>')
     .description('Upload a video file as a clip')
-    .option('--name <name>', 'Override the clip name (defaults to filename)')
-    .action(async (file: string, opts: { name?: string }, cmd: Command) => {
+    .option('--brand <id>', 'Brand to attach the clip to (defaults to your only brand)')
+    .option('--name <name>', 'Override the clip title (defaults to filename)')
+    .action(async (file: string, opts: { brand?: string; name?: string }, cmd: Command) => {
       const globals = cmd.optsWithGlobals<GlobalOpts>()
       const printer = createPrinter(globals)
       const spinner = printer.spinner('Uploading clip…')
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
+        const brandId = await resolveBrandId(client, opts.brand)
         const clip = await client.clips.upload(file, {
-          name: opts.name,
+          brandId,
+          ...(opts.name ? { title: opts.name } : {}),
           onProgress: (pct) => {
             if (pct > 0 && pct < 100) spinner.stop()
           },
