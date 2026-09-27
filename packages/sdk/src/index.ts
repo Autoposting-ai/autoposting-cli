@@ -11,7 +11,7 @@ export { CarouselsResource } from './resources/carousels'
 export type { Carousel, CarouselSlide, CreateCarouselParams, GenerateCarouselParams } from './types/carousels'
 export { ClipsResource } from './resources/clips'
 export type { UploadClipOptions } from './resources/clips'
-export type { Clip, ClipStatus, ImportClipParams } from './types/clips'
+export type { Clip, ClipStatus, CreateClipDraftParams, ImportClipParams, RenderClipParams } from './types/clips'
 export { PostsResource } from './resources/posts'
 export type {
   Post,

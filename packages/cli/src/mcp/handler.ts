@@ -1,5 +1,5 @@
 import type { Autoposting } from '@autoposting.ai/sdk'
-import type { Platform } from '@autoposting.ai/sdk'
+import type { CreateClipDraftParams, MediaInput, Platform } from '@autoposting.ai/sdk'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 
 type ToolArgs = Record<string, unknown>
@@ -86,6 +86,7 @@ async function dispatchToolCall(
         ...(args.scheduledAt
           ? { scheduledAt: args.scheduledAt as string }
           : {}),
+        ...(args.media ? { media: args.media as MediaInput[] } : {}),
       })
       return ok(result)
     }
@@ -100,6 +101,7 @@ async function dispatchToolCall(
         ...(args.scheduledAt
           ? { scheduledAt: args.scheduledAt as string }
           : {}),
+        ...(args.media ? { media: args.media as MediaInput[] } : {}),
       })
       return ok(result)
     }
@@ -292,12 +294,23 @@ async function dispatchToolCall(
     case 'import-clip': {
       const result = await client.clips.importUrl({
         url: args.url as string,
-        ...(args.name ? { name: args.name as string } : {}),
+        brandId: args.brandId as string,
+        ...(args.name ? { title: args.name as string } : {}),
       })
       return ok(result)
     }
     case 'render-clip': {
-      const result = await client.clips.render(args.id as string)
+      const result = await client.clips.render(args.id as string, {
+        editRevision: args.editRevision as number,
+        ...(args.candidateId ? { candidateId: args.candidateId as string } : {}),
+      })
+      return ok(result)
+    }
+    case 'create-clip-draft': {
+      const result = await client.clips.createDraft(args.id as string, {
+        ...(args.candidateId ? { candidateId: args.candidateId as string } : {}),
+        ...(args.aspectRatio ? { aspectRatio: args.aspectRatio as CreateClipDraftParams['aspectRatio'] } : {}),
+      })
       return ok(result)
     }
     case 'delete-clip': {

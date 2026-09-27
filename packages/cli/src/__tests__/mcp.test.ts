@@ -117,6 +117,7 @@ describe('MCP tool definitions', () => {
       'get-clip',
       'import-clip',
       'render-clip',
+      'create-clip-draft',
       'delete-clip',
       // carousels
       'list-carousels',
@@ -217,5 +218,45 @@ describe('MCP tool handler', () => {
     expect(content?.type).toBe('text')
     if (content?.type !== 'text') throw new Error('Expected text error content')
     expect(content.text).toMatch(/Invalid platform/)
+  })
+
+  it('forwards media on create-post and update-post', async () => {
+    const calls: unknown[] = []
+    const client = {
+      posts: {
+        create: async (params: unknown) => { calls.push(params); return { id: 'p1' } },
+        update: async (id: string, params: unknown) => { calls.push({ id, ...(params as object) }); return { id } },
+      },
+    }
+    const media = [{ url: 'https://cdn.example.com/a.jpg', type: 'image' }]
+
+    await handleToolCall('create-post', { brandSlug: 'b', text: 't', platforms: 'x', media }, client as never)
+    await handleToolCall('update-post', { id: 'p1', media }, client as never)
+
+    expect(calls).toEqual([
+      { brandSlug: 'b', text: 't', platforms: ['x'], media },
+      { id: 'p1', media },
+    ])
+  })
+
+  it('runs the AI clipping chain with brandId, editRevision and draft creation', async () => {
+    const calls: unknown[] = []
+    const client = {
+      clips: {
+        importUrl: async (p: unknown) => { calls.push(['import', p]); return { clipId: 'c1' } },
+        render: async (id: string, p: unknown) => { calls.push(['render', id, p]); return { jobIds: [] } },
+        createDraft: async (id: string, p: unknown) => { calls.push(['draft', id, p]); return { postId: 'p1' } },
+      },
+    }
+
+    await handleToolCall('import-clip', { url: 'https://youtu.be/x', brandId: 'b1', name: 'n' }, client as never)
+    await handleToolCall('render-clip', { id: 'c1', editRevision: 2, candidateId: 'k1' }, client as never)
+    await handleToolCall('create-clip-draft', { id: 'c1', aspectRatio: '9:16' }, client as never)
+
+    expect(calls).toEqual([
+      ['import', { url: 'https://youtu.be/x', brandId: 'b1', title: 'n' }],
+      ['render', 'c1', { editRevision: 2, candidateId: 'k1' }],
+      ['draft', 'c1', { aspectRatio: '9:16' }],
+    ])
   })
 })

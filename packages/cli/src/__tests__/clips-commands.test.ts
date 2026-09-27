@@ -39,6 +39,7 @@ describe('ap clips --help', () => {
     expect(result.stdout).toContain('import')
     expect(result.stdout).toContain('render')
     expect(result.stdout).toContain('delete')
+    expect(result.stdout).toContain('draft')
   })
 })
 
@@ -66,6 +67,27 @@ describe('ap clips import', () => {
     })
     expect(result.exitCode).not.toBe(0)
     expect(result.stderr + result.stdout).toMatch(/--url/)
+  })
+})
+
+describe('AI clipping options', () => {
+  it('import exposes --brand and --name', async () => {
+    const result = await ap(['clips', 'import', '--help'])
+    expect(result.stdout).toContain('--brand')
+    expect(result.stdout).toContain('--name')
+  })
+
+  it('render exposes --candidate and --revision', async () => {
+    const result = await ap(['clips', 'render', '--help'])
+    expect(result.stdout).toContain('--candidate')
+    expect(result.stdout).toContain('--revision')
+  })
+
+  it('draft exposes --candidate and --aspect-ratio', async () => {
+    const result = await ap(['clips', 'draft', '--help'])
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('--candidate')
+    expect(result.stdout).toContain('--aspect-ratio')
   })
 })
 
