@@ -1,6 +1,10 @@
 import type { Autoposting } from '@autoposting.ai/sdk'
 import type { CreateClipDraftParams, MediaInput, Platform } from '@autoposting.ai/sdk'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
+import { readFile } from 'node:fs/promises'
+import { basename } from 'node:path'
+import { assertApiRoute, fetchApiRoutes } from '../lib/api-routes.js'
+import { extToMime } from '../lib/media-flags.js'
 
 type ToolArgs = Record<string, unknown>
 const PLATFORMS: Platform[] = [
@@ -34,6 +38,18 @@ function parsePlatforms(raw: unknown): Platform[] {
     )
   }
   return platforms as Platform[]
+}
+
+// One allow-list fetch per server process; a failed fetch is not cached, so the next call retries.
+const routeCache = new WeakMap<object, Promise<string[]>>()
+function apiRoutes(client: Autoposting): Promise<string[]> {
+  let routes = routeCache.get(client)
+  if (!routes) {
+    routes = fetchApiRoutes(client)
+    routeCache.set(client, routes)
+    routes.catch(() => routeCache.delete(client))
+  }
+  return routes
 }
 
 function parseEvents(raw: unknown): string[] {
@@ -313,6 +329,21 @@ async function dispatchToolCall(
       })
       return ok(result)
     }
+    case 'upload-clip': {
+      const result = await client.clips.upload(args.filePath as string, {
+        brandId: args.brandId as string,
+        ...(args.title ? { title: args.title as string } : {}),
+      })
+      return ok(result)
+    }
+    case 'publish-clip': {
+      const body: Record<string, unknown> = { mode: args.mode }
+      for (const k of ['candidateId', 'text', 'brandSlug', 'scheduledAt', 'aspectRatio']) {
+        if (args[k] !== undefined) body[k] = args[k]
+      }
+      if (args.platforms !== undefined) body.platforms = parsePlatforms(args.platforms)
+      return ok(await client.request('POST', `/clips/${encodeURIComponent(args.id as string)}/publish`, body))
+    }
     case 'delete-clip': {
       await client.clips.remove(args.id as string)
       return ok({ deleted: true, id: args.id })
@@ -384,6 +415,33 @@ async function dispatchToolCall(
     case 'test-webhook': {
       await client.webhooks.test(args.id as string)
       return ok({ sent: true, id: args.id })
+    }
+
+    // Media
+    case 'upload-media': {
+      const filePath = args.filePath as string
+      const filename = basename(filePath)
+      const uploaded = await client.media.upload({
+        data: new Uint8Array(await readFile(filePath)),
+        filename,
+        contentType: extToMime(filename),
+      })
+      return ok({ url: uploaded.url, type: uploaded.type, ...(args.altText ? { altText: args.altText } : {}) })
+    }
+
+    // Any other REST route on the server's allow-list
+    case 'list-api-routes': {
+      const prefix = typeof args.prefix === 'string' ? args.prefix : '/'
+      const routes = await apiRoutes(client)
+      return ok({ routes: routes.filter((r) => r.split(' ')[1].startsWith(prefix)) })
+    }
+    case 'api-request': {
+      const method = String(args.method ?? '').toUpperCase()
+      const path = String(args.path ?? '')
+      assertApiRoute(await apiRoutes(client), method, path)
+      const query = typeof args.query === 'object' && args.query ? (args.query as Record<string, unknown>) : undefined
+      const body = method !== 'GET' && method !== 'DELETE' && typeof args.body === 'object' && args.body ? args.body : undefined
+      return ok(await client.request(method as never, path, body, query))
     }
 
     // Billing
