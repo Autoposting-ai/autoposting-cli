@@ -5,7 +5,7 @@ const MEDIA_ITEMS = {
   type: 'array',
   maxItems: 10,
   description:
-    'Images or videos to attach, as public https URLs. To attach a local file, use `ap posts create --media <file>` instead.',
+    'Images or videos to attach, as https URLs. For a local file, call upload-media first and pass its result here.',
   items: {
     type: 'object',
     properties: {
@@ -564,6 +564,40 @@ export const ALL_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'upload-clip',
+    description:
+      'Upload a local video file for AI clipping (multipart, any size). Poll get-clip until status is ready, then render-clip.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filePath: { type: 'string', description: 'Absolute path to the video file on this machine' },
+        brandId: { type: 'string', description: 'Brand ID (the `id` from list-brands)' },
+        title: { type: 'string', description: 'Optional clip title' },
+      },
+      required: ['filePath', 'brandId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'publish-clip',
+    description: 'Publish, schedule, or save as a draft a rendered clip candidate.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Clip ID' },
+        mode: { type: 'string', enum: ['publish', 'schedule', 'draft'] },
+        candidateId: { type: 'string', description: 'Candidate to post (defaults to the best rendered one)' },
+        platforms: { type: 'string', description: 'Comma-separated platforms, e.g. "x,linkedin"' },
+        text: { type: 'string', description: 'Post caption' },
+        brandSlug: { type: 'string', description: 'Brand slug' },
+        scheduledAt: { type: 'string', description: 'ISO 8601 time, for mode "schedule"' },
+        aspectRatio: { type: 'string', enum: ['9:16', '4:5', '1:1', '16:9'] },
+      },
+      required: ['id', 'mode'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'delete-clip',
     description: 'Permanently delete a video clip by ID.',
     inputSchema: {
@@ -572,6 +606,49 @@ export const ALL_TOOLS: Tool[] = [
         id: { type: 'string', description: 'Clip ID to delete' },
       },
       required: ['id'],
+      additionalProperties: false,
+    },
+  },
+
+  // Media
+  {
+    name: 'upload-media',
+    description:
+      'Upload a local image or video and get back a media item ({url, type, altText}) to pass in create-post or update-post `media`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        filePath: { type: 'string', description: 'Absolute path to the file on this machine' },
+        altText: { type: 'string', description: 'Optional alt text' },
+      },
+      required: ['filePath'],
+      additionalProperties: false,
+    },
+  },
+
+  // Any other REST route
+  {
+    name: 'list-api-routes',
+    description: 'List the REST routes api-request may call, as "METHOD /path/:param". Optional prefix filter, e.g. "/clips".',
+    inputSchema: {
+      type: 'object',
+      properties: { prefix: { type: 'string', description: 'Only routes whose path starts with this' } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'api-request',
+    description:
+      'Call any Autoposting REST route on the allow-list (see list-api-routes) with your API key. Replace :params with real IDs.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] },
+        path: { type: 'string', description: 'Path such as /clips/abc123/jobs, no query string' },
+        query: { type: 'object', description: 'Query string parameters' },
+        body: { type: 'object', description: 'JSON body for POST, PUT and PATCH' },
+      },
+      required: ['method', 'path'],
       additionalProperties: false,
     },
   },

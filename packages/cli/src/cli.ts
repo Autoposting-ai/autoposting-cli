@@ -20,6 +20,7 @@ import { createUpdateCommand } from './commands/update.js'
 import { createCompletionCommand } from './commands/completion.js'
 import { createMcpCommand } from './commands/mcp.js'
 import { createConfigCommand } from './commands/config.js'
+import { createApiCommand } from './commands/api.js'
 import { disableColor } from './output/index.js'
 
 const program = new Command()
@@ -42,6 +43,7 @@ program.addCommand(createBillingCommand())
 program.addCommand(createBrandsCommand())
 program.addCommand(createCarouselsCommand())
 program.addCommand(createClipsCommand())
+program.addCommand(createApiCommand())
 program.addCommand(createPostsCommand())
 program.addCommand(createAgentsCommand())
 program.addCommand(createKbCommand())
