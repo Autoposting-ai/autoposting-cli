@@ -95,6 +95,14 @@ describe('local ap mcp file uploads', () => {
     expect(JSON.parse((res.content[0] as { text: string }).text)).toEqual({ url: 'https://cdn.example.com/a.png', type: 'image', altText: 'dot' })
   })
 
+  it('upload-media refuses a file that is not an image or video', async () => {
+    let called = false
+    const client = { media: { upload: async () => { called = true; return {} } } }
+    const res = await handleToolCall('upload-media', { filePath: '/home/me/.env' }, client as never)
+    expect(res.isError).toBe(true)
+    expect(called).toBe(false)
+  })
+
   it('upload-clip hands the file path to the multipart clip upload', async () => {
     const seen: unknown[] = []
     const client = { clips: { upload: async (path: string, opts: unknown) => { seen.push([path, opts]); return { id: 'c1' } } } }
