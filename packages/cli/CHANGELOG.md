@@ -1,5 +1,16 @@
 # autoposting-cli
 
+## 0.4.0
+
+### Minor Changes
+
+- 87401b2: Add `ap api <METHOD> <path>` to call any REST route on the server allow-list (`--list` shows them), and five local `ap mcp` tools: `api-request`, `list-api-routes`, `upload-media` (local image or video for posts), `upload-clip` (local video for AI clipping) and `publish-clip`. The allow-list comes from the hosted server, and both refuse every route if it cannot be loaded.
+
+### Patch Changes
+
+- 38bf7b4: Fix `ap auth login`: read the device code from the server's `{ success, data }` envelope (it printed "Enter code undefined at undefined"), and treat the server's HTTP 400 `slow_down`, `expired_token` and `access_denied` poll answers as statuses instead of crashing.
+  - @autoposting.ai/sdk@0.4.0
+
 ## 0.3.6
 
 ### Patch Changes
