@@ -1,5 +1,13 @@
 # autoposting-cli
 
+## 0.3.6
+
+### Patch Changes
+
+- 0d4ce70: Fix AI clipping and post media over the CLI, SDK and local MCP server: `clips import` sends the brand, `clips render` sends the current edit revision, new `clips draft` turns a rendered clip into a draft post, and `create-post` / `update-post` MCP tools accept media URLs.
+- Updated dependencies [0d4ce70]
+  - @autoposting.ai/sdk@0.3.6
+
 ## 0.3.5
 
 ### Patch Changes
