@@ -55,17 +55,29 @@ export async function requestDeviceCode(baseUrl: string): Promise<DeviceCodeResp
     throw new Error(`Device code request failed (${res.status}): ${text}`)
   }
 
-  return parseJson<DeviceCodeResponse>(res)
+  // The server wraps the fields in its usual {success, data} envelope.
+  const { data } = await parseJson<{ data?: DeviceCodeResponse }>(res)
+  if (!data?.deviceCode || !data.userCode || !data.verificationUri) {
+    throw new Error('Device code response is missing deviceCode, userCode or verificationUri.')
+  }
+  return data
 }
 
 export async function pollDeviceCode(baseUrl: string, deviceCode: string): Promise<PollResult> {
   const url = `${baseUrl}/auth/cli/poll?device_code=${encodeURIComponent(deviceCode)}`
   const res = await fetchWithTimeout(url)
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`Poll request failed (${res.status}): ${text}`)
+  const text = await res.text().catch(() => res.statusText)
+  let body: Partial<PollResult> = {}
+  try {
+    body = JSON.parse(text) as Partial<PollResult>
+  } catch {
+    // handled below
   }
-
-  return parseJson<PollResult>(res)
+  // The server answers slow_down, expired_token and access_denied with HTTP 400 and a status.
+  if (res.ok || (res.status === 400 && body.status)) {
+    if (!body.status) throw new Error(`Poll response (HTTP ${res.status}) has no status.`)
+    return body as PollResult
+  }
+  throw new Error(`Poll request failed (${res.status}): ${text}`)
 }
