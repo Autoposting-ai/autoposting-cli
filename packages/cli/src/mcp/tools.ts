@@ -1,5 +1,23 @@
 import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 
+// MCP carries JSON, not file bytes: media must already be at a public https URL.
+const MEDIA_ITEMS = {
+  type: 'array',
+  maxItems: 10,
+  description:
+    'Images or videos to attach, as public https URLs. To attach a local file, use `ap posts create --media <file>` instead.',
+  items: {
+    type: 'object',
+    properties: {
+      url: { type: 'string', description: 'Public https URL of the image or video' },
+      type: { type: 'string', enum: ['image', 'video', 'gif'] },
+      altText: { type: 'string', description: 'Optional alt text' },
+    },
+    required: ['url', 'type'],
+    additionalProperties: false,
+  },
+}
+
 export const ALL_TOOLS: Tool[] = [
   // Posts
   {
@@ -48,6 +66,7 @@ export const ALL_TOOLS: Tool[] = [
           type: 'string',
           description: 'ISO 8601 datetime to schedule the post',
         },
+        media: MEDIA_ITEMS,
       },
       required: ['brandSlug', 'text', 'platforms'],
       additionalProperties: false,
@@ -55,7 +74,7 @@ export const ALL_TOOLS: Tool[] = [
   },
   {
     name: 'update-post',
-    description: 'Update the text, platforms, or scheduled time of an existing post.',
+    description: 'Update the text, platforms, scheduled time, or media of an existing post.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -63,6 +82,7 @@ export const ALL_TOOLS: Tool[] = [
         text: { type: 'string', description: 'New post text' },
         platforms: { type: 'string', description: 'Comma-separated new platform list' },
         scheduledAt: { type: 'string', description: 'New ISO 8601 scheduled datetime' },
+        media: MEDIA_ITEMS,
       },
       required: ['id'],
       additionalProperties: false,
@@ -502,24 +522,42 @@ export const ALL_TOOLS: Tool[] = [
   },
   {
     name: 'import-clip',
-    description: 'Import a video clip from a remote URL.',
+    description:
+      'Start AI clipping: import a long video from a public URL (e.g. a YouTube video). Poll get-clip until status is ready.',
     inputSchema: {
       type: 'object',
       properties: {
         url: { type: 'string', description: 'URL of the video to import' },
+        brandId: { type: 'string', description: 'Brand ID (the `id` from list-brands)' },
         name: { type: 'string', description: 'Optional name for the imported clip' },
       },
-      required: ['url'],
+      required: ['url', 'brandId'],
       additionalProperties: false,
     },
   },
   {
     name: 'render-clip',
-    description: 'Trigger rendering for a video clip.',
+    description: 'Render a clip (uses credits). Call get-clip first for its editRevision and candidates.',
     inputSchema: {
       type: 'object',
       properties: {
         id: { type: 'string', description: 'Clip ID to render' },
+        editRevision: { type: 'number', description: 'Current editRevision from get-clip' },
+        candidateId: { type: 'string', description: 'Optional: render only this candidate' },
+      },
+      required: ['id', 'editRevision'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create-clip-draft',
+    description: 'Create a draft post from a rendered clip. Publish it with publish-post or schedule it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Clip ID' },
+        candidateId: { type: 'string', description: 'Optional candidate ID (defaults to the first rendered one)' },
+        aspectRatio: { type: 'string', enum: ['9:16', '16:9', '1:1', '4:5'], description: 'Optional render format' },
       },
       required: ['id'],
       additionalProperties: false,

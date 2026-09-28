@@ -70,6 +70,7 @@ export interface UpdatePostParams {
   text?: string
   platforms?: Platform[]
   scheduledAt?: string
+  media?: MediaInput[]
 }
 
 export interface ListPostsParams {

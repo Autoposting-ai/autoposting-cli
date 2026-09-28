@@ -124,7 +124,7 @@ describe('ClipsResource', () => {
     expect(result).toEqual(clip)
   })
 
-  it('importUrl() sends POST /clips/import-url and returns { clipId }', async () => {
+  it('importUrl() sends url, brandId and title to POST /clips/import-url', async () => {
     let capturedBody: unknown = null
     server.use(
       http.post(`${BASE}/clips/import-url`, async ({ request }) => {
@@ -135,20 +135,54 @@ describe('ClipsResource', () => {
 
     const result = await makeClient().clips.importUrl({
       url: 'https://example.com/video.mp4',
-      name: 'my-clip',
+      brandId: 'brand-1',
+      title: 'my-clip',
     })
-    expect(capturedBody).toEqual({ url: 'https://example.com/video.mp4', name: 'my-clip' })
+    expect(capturedBody).toEqual({ url: 'https://example.com/video.mp4', brandId: 'brand-1', title: 'my-clip' })
     expect(result).toEqual({ clipId: 'clip-1' })
   })
 
-  it('render() sends POST /clips/:id/render and returns job ids', async () => {
+  it('render() sends the given editRevision and candidateId', async () => {
     const payload = { jobIds: ['job-1'], activeJobIds: ['job-1'], reusedJobIds: [] as string[] }
+    let capturedBody: unknown = null
     server.use(
-      http.post(`${BASE}/clips/clip-1/render`, () => HttpResponse.json(wrap(payload))),
+      http.post(`${BASE}/clips/clip-1/render`, async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json(wrap(payload))
+      }),
     )
 
-    const result = await makeClient().clips.render('clip-1')
+    const result = await makeClient().clips.render('clip-1', { editRevision: 3, candidateId: 'cand-1' })
+    expect(capturedBody).toEqual({ editRevision: 3, candidateId: 'cand-1' })
     expect(result).toEqual(payload)
+  })
+
+  it('render() reads the current editRevision when none is given', async () => {
+    let capturedBody: unknown = null
+    server.use(
+      http.get(`${BASE}/clips/clip-1`, () => HttpResponse.json(wrap({ ...makeClip(), editRevision: 7 }))),
+      http.post(`${BASE}/clips/clip-1/render`, async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json(wrap({ jobIds: [], activeJobIds: [], reusedJobIds: [] }))
+      }),
+    )
+
+    await makeClient().clips.render('clip-1')
+    expect(capturedBody).toEqual({ editRevision: 7 })
+  })
+
+  it('createDraft() sends POST /clips/:id/create-draft and returns { postId }', async () => {
+    let capturedBody: unknown = null
+    server.use(
+      http.post(`${BASE}/clips/clip-1/create-draft`, async ({ request }) => {
+        capturedBody = await request.json()
+        return HttpResponse.json(wrap({ postId: 'post-1' }))
+      }),
+    )
+
+    const result = await makeClient().clips.createDraft('clip-1', { candidateId: 'cand-1', aspectRatio: '9:16' })
+    expect(capturedBody).toEqual({ candidateId: 'cand-1', aspectRatio: '9:16' })
+    expect(result).toEqual({ postId: 'post-1' })
   })
 
   it('remove() sends DELETE /clips/:id and resolves', async () => {

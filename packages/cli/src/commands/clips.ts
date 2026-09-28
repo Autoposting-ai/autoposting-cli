@@ -114,22 +114,25 @@ export function createClipsCommand(): Command {
       }
     })
 
-  // ap clips import --url <url> [--name <name>]
+  // ap clips import --url <url> [--brand <id>] [--name <name>]
   clips
     .command('import')
-    .description('Import a clip from a URL')
+    .description('Start AI clipping from a video URL (e.g. a YouTube video)')
     .requiredOption('--url <url>', 'URL of the video to import')
+    .option('--brand <id>', 'Brand ID (auto-picked when the workspace has exactly one brand)')
     .option('--name <name>', 'Name for the imported clip')
-    .action(async (opts: { url: string; name?: string }, cmd: Command) => {
+    .action(async (opts: { url: string; brand?: string; name?: string }, cmd: Command) => {
       const globals = cmd.optsWithGlobals<GlobalOpts>()
       const printer = createPrinter(globals)
       const spinner = printer.spinner('Importing clip…')
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
+        const brandId = await resolveBrandId(client, opts.brand)
         const { clipId } = await client.clips.importUrl({
           url: opts.url,
-          ...(opts.name ? { name: opts.name } : {}),
+          brandId,
+          ...(opts.name ? { title: opts.name } : {}),
         })
         spinner.stop()
         printer.log({ clipId })
@@ -140,20 +143,51 @@ export function createClipsCommand(): Command {
       }
     })
 
-  // ap clips render <id>
+  // ap clips render <id> [--candidate <id>] [--revision <n>]
   clips
     .command('render <id>')
-    .description('Trigger rendering for a clip')
-    .action(async (id: string, _opts: Record<string, unknown>, cmd: Command) => {
+    .description('Render a clip (uses credits)')
+    .option('--candidate <id>', 'Render only this candidate')
+    .option('--revision <n>', 'Clip editRevision (read from the clip when omitted)', (v) => Number(v))
+    .action(async (id: string, opts: { candidate?: string; revision?: number }, cmd: Command) => {
       const globals = cmd.optsWithGlobals<GlobalOpts>()
       const printer = createPrinter(globals)
       const spinner = printer.spinner(`Rendering clip "${id}"…`)
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        const { jobIds, activeJobIds, reusedJobIds } = await client.clips.render(id)
+        const { jobIds, activeJobIds, reusedJobIds } = await client.clips.render(id, {
+          ...(opts.revision !== undefined ? { editRevision: opts.revision } : {}),
+          ...(opts.candidate ? { candidateId: opts.candidate } : {}),
+        })
         spinner.stop()
         printer.log({ jobIds, activeJobIds, reusedJobIds })
+      } catch (err) {
+        spinner.fail()
+        printer.error(err as Error)
+        process.exit(resolveExitCode(err))
+      }
+    })
+
+  // ap clips draft <id> [--candidate <id>] [--aspect-ratio <ratio>]
+  clips
+    .command('draft <id>')
+    .description('Create a draft post from a rendered clip')
+    .option('--candidate <id>', 'Candidate to use (defaults to the first rendered one)')
+    .option('--aspect-ratio <ratio>', 'Render format: 9:16, 16:9, 1:1 or 4:5')
+    .action(async (id: string, opts: { candidate?: string; aspectRatio?: '9:16' | '16:9' | '1:1' | '4:5' }, cmd: Command) => {
+      const globals = cmd.optsWithGlobals<GlobalOpts>()
+      const printer = createPrinter(globals)
+      const spinner = printer.spinner(`Creating draft from clip "${id}"…`)
+      try {
+        const cred = resolveAuth({ apiKey: globals.apiKey })
+        const client = new Autoposting({ apiKey: cred.apiKey })
+        const { postId } = await client.clips.createDraft(id, {
+          ...(opts.candidate ? { candidateId: opts.candidate } : {}),
+          ...(opts.aspectRatio ? { aspectRatio: opts.aspectRatio } : {}),
+        })
+        spinner.stop()
+        printer.log({ postId })
       } catch (err) {
         spinner.fail()
         printer.error(err as Error)

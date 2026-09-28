@@ -1,6 +1,6 @@
 import { Resource } from '../resource'
 import { AutopostingError } from '../errors'
-import type { Clip, ImportClipParams } from '../types/clips'
+import type { Clip, CreateClipDraftParams, ImportClipParams, RenderClipParams } from '../types/clips'
 
 // R2/S3 multipart: every part except the last must be ≥5MB; at most 10,000 parts.
 const MIN_PART_SIZE = 5 * 1024 * 1024
@@ -127,8 +127,20 @@ export class ClipsResource extends Resource {
   }
 
   /** POST /clips/:id/render — backend returns render job ids, not a Clip. */
-  render(id: string): Promise<{ jobIds: string[]; activeJobIds: string[]; reusedJobIds: string[] }> {
-    return this.client.request('POST', `/clips/${id}/render`)
+  async render(
+    id: string,
+    params: RenderClipParams = {},
+  ): Promise<{ jobIds: string[]; activeJobIds: string[]; reusedJobIds: string[] }> {
+    const editRevision = params.editRevision ?? (await this.retrieve(id)).editRevision ?? 0
+    return this.client.request('POST', `/clips/${id}/render`, {
+      editRevision,
+      ...(params.candidateId ? { candidateId: params.candidateId } : {}),
+    })
+  }
+
+  /** POST /clips/:id/create-draft — turns a rendered clip into a draft post. */
+  createDraft(id: string, params: CreateClipDraftParams = {}): Promise<{ postId: string }> {
+    return this.client.request<{ postId: string }>('POST', `/clips/${id}/create-draft`, params)
   }
 
   remove(id: string): Promise<void> {
