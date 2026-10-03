@@ -75,6 +75,12 @@ async function dispatchToolCall(
   client: Autoposting,
 ): Promise<CallToolResult> {
   switch (name) {
+    case 'delete-account-import': return ok(await client.accountOnboarding.remove(args.id as string))
+    case 'import-accounts': return ok(await client.accountOnboarding.create({ csv: args.csv as string }))
+    case 'prepare-account-import': return ok(await client.accountOnboarding.prepare(args.id as string, args.offset as number | undefined))
+    case 'account-import-status': return ok(await client.accountOnboarding.status(args.id as string, { ...(args.offset !== undefined ? {offset:args.offset as number}:{}), ...(args.limit !== undefined ? {limit:args.limit as number}:{}) }))
+    case 'authorize-import-account': return ok(await client.accountOnboarding.authorize(args.id as string, args.rowId as string))
+    case 'confirm-import-account': return ok(await client.accountOnboarding.confirm(args.id as string, args.rowId as string, args.tokenId as string))
     // Posts
     case 'list-posts': {
       const result = await client.posts.list({

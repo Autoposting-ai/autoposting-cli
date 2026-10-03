@@ -1,3 +1,4 @@
+import { AccountOnboardingResource } from './resources/account-onboarding'
 import { VERSION } from './version'
 import type { ApiResponse } from './types'
 import { createError, RateLimitError, AutopostingError } from './errors'
@@ -60,6 +61,7 @@ export class Autoposting {
   readonly media: MediaResource
   readonly agents: AgentsResource
   readonly billing: BillingResource
+  readonly accountOnboarding: AccountOnboardingResource
   readonly brands: BrandsResource
   readonly carousels: CarouselsResource
   readonly clips: ClipsResource
@@ -95,6 +97,7 @@ export class Autoposting {
     this.media = new MediaResource(this)
     this.agents = new AgentsResource(this)
     this.billing = new BillingResource(this)
+    this.accountOnboarding = new AccountOnboardingResource(this)
     this.brands = new BrandsResource(this)
     this.carousels = new CarouselsResource(this)
     this.clips = new ClipsResource(this)

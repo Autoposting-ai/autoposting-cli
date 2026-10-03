@@ -19,7 +19,7 @@ Built for developers, marketers, and AI agents who need programmatic social medi
 
 <br>
 
-**61 commands** across **13 domains** · **51 MCP tools** for AI agents · **TypeScript SDK** for programmatic access
+**CLI commands** · **MCP tools** for AI agents · **TypeScript SDK** for programmatic access
 
 <br>
 
@@ -143,6 +143,30 @@ ap brands list    # list all brands in your workspace
 | `ap posts retry <id>` | Retry a failed post |
 | `ap posts rewrite <id>` | AI-rewrite post text |
 | `ap posts score <id>` | AI-score with feedback |
+
+### Account CSV onboarding
+
+Import brands and account URLs, then let Codex / Claude Code prepare brands and present provider approval links:
+
+```sh
+ap accounts import --from accounts.csv --json
+ap accounts prepare IMPORT_ID --json
+ap accounts status IMPORT_ID --json
+ap accounts authorize IMPORT_ID ROW_ID --json
+```
+
+Repeat preparation with the returned `nextOffset` until null. Status is paginated (`--offset`, `--limit`, maximum 100 rows). Open approval links in your browser, choose the intended account, approve access, then check status. Exact repeated imports recover the same progress; preparation reuses brands. Links expire after ten minutes, so request them as needed.
+
+CSV headers: `brand_name,platform,account_url`; optional `brand_slug,timezone,account_type`. Up to 1000 input rows and 90KB per CSV. Quoted fields are supported; duplicate account rows collapse. No passwords or provider tokens. Instagram/X/Threads profile usernames and YouTube channel IDs match automatically. YouTube handles and LinkedIn vanity URLs may require the user to compare the returned actual account with the CSV URL, then explicitly confirm:
+
+```sh
+ap accounts confirm IMPORT_ID ROW_ID --token-id TOKEN_ID --json
+ap accounts delete IMPORT_ID --force # removes progress only; preserves accounts and brands
+```
+
+MCP equivalents: `import-accounts`, `prepare-account-import`, `account-import-status`, `authorize-import-account`, `confirm-import-account`, `delete-account-import`. Hosted tools accept CSV contents; stdio tools use the same server workflow. Mutations require `brands:write`; status requires `brands:read`. Provider approval, workspace permissions and connected-account plan limits still apply. A link alone is never reported as a connection.
+
+[Full workflow and REST reference](https://github.com/Autoposting-ai/autoposting-front-back/blob/production/docs/account-onboarding.md).
 
 ### Brands
 

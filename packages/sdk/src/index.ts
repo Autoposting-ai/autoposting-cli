@@ -58,3 +58,6 @@ export {
 export { Resource } from './resource'
 export type { Platform, Paginated, ApiResponse } from './types'
 export { VERSION } from './version'
+
+export { AccountOnboardingResource } from './resources/account-onboarding'
+export type { AccountImportRow, AccountImport, AccountImportStatus, AccountImportRowStatus, AccountApproval } from './resources/account-onboarding'

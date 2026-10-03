@@ -331,3 +331,20 @@ Built by **[Autoposting.ai](https://autoposting.ai)** — AI-powered social medi
 [Website](https://autoposting.ai) · [CLI](https://www.npmjs.com/package/@autoposting.ai/cli) · [GitHub](https://github.com/Autoposting-ai/autoposting-cli) · [@iuditg](https://x.com/iuditg)
 
 </div>
+
+## CSV account onboarding
+
+```typescript
+const imported = await client.accountOnboarding.create({ csv: csvContents })
+let offset: number | null = 0
+while (offset !== null) {
+  const page = await client.accountOnboarding.prepare(imported.id, offset)
+  // Inspect row errors before continuing.
+  offset = page.nextOffset
+}
+const status = await client.accountOnboarding.status(imported.id, { limit: 50 })
+const approval = await client.accountOnboarding.authorize(imported.id, status.rows[0].id)
+// Present approval.url to the user. They approve in their browser, then check status again.
+```
+
+The workspace retains progress across CLI, API and MCP. Use `status` pagination to inspect all rows. `confirm(id, rowId, tokenId)` records the user's explicit identity confirmation for vanity URLs; the token must already be a healthy account belonging to that workspace and brand. `remove(id)` deletes import metadata only. [CSV format, scope checks, plan limits and full reference](https://github.com/Autoposting-ai/autoposting-front-back/blob/production/docs/account-onboarding.md).

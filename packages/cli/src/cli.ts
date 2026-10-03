@@ -4,6 +4,7 @@ import { VERSION } from '@autoposting.ai/sdk'
 import { createAgentsCommand } from './commands/agents.js'
 import { createAuthCommand } from './commands/auth.js'
 import { createBillingCommand } from './commands/billing.js'
+import { createAccountsCommand } from './commands/accounts.js'
 import { createBrandsCommand } from './commands/brands.js'
 import { createCarouselsCommand } from './commands/carousels.js'
 import { createClipsCommand } from './commands/clips.js'
@@ -40,6 +41,7 @@ const program = new Command()
 
 program.addCommand(createAuthCommand())
 program.addCommand(createBillingCommand())
+program.addCommand(createAccountsCommand())
 program.addCommand(createBrandsCommand())
 program.addCommand(createCarouselsCommand())
 program.addCommand(createClipsCommand())
