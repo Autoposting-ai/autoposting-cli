@@ -67,6 +67,10 @@ export function createBillingCommand(): Command {
         const client = new Autoposting({ apiKey: cred.apiKey })
         const credits = await client.billing.credits()
         spinner.stop()
+        if (!printer.isTty()) {
+          printer.log(credits)
+          return
+        }
         printer.table(
           [
             {
