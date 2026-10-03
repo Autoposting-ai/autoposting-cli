@@ -3,6 +3,7 @@ import { Command } from 'commander'
 const ALL_COMMANDS = [
   'posts',
   'brands',
+  'accounts',
   'agents',
   'kb',
   'ideas',

@@ -19,6 +19,13 @@ const MEDIA_ITEMS = {
 }
 
 export const ALL_TOOLS: Tool[] = [
+  {name:'delete-account-import',description:'Delete import progress only. Connected accounts and brands remain. Ask the user before discarding their progress.',inputSchema:{type:'object',properties:{id:{type:'string',description:'Import id'}},required:['id']}},
+  { name: 'import-accounts', description: 'Import 1–1000 social account rows from CSV. Headers: brand_name, platform, account_url; optional brand_slug, timezone, account_type. Returns a durable import id. Repeating the same import reuses progress. No passwords or provider tokens.', inputSchema: {type:'object',properties:{csv:{type:'string',maxLength:90000,description:'CSV contents, including header row'}},required:['csv']} },
+  {name:'prepare-account-import',description:'Create or reuse up to 25 brands. Repeat with nextOffset until null; safe to resume.',inputSchema:{type:'object',properties:{id:{type:'string',description:'Import id'},offset:{type:'integer',minimum:0,description:'Next row offset; default 0'}},required:['id']}},
+  {name:'account-import-status',description:'Check actual imported account connections and plan capacity. A link alone is not a connection. Vanity URLs may need explicit account confirmation.',inputSchema:{type:'object',properties:{id:{type:'string',description:'Import id'},offset:{type:'integer',minimum:0,description:'Row offset; default 0'},limit:{type:'integer',minimum:1,maximum:100,description:'Rows per page; default 50'}},required:['id']}},
+  {name:'authorize-import-account',description:'Generate a fresh provider approval link for one row. Present it to the user, who opens it in their browser and approves the intended account. Then check status. Links expire after 10 minutes.',inputSchema:{type:'object',properties:{id:{type:'string',description:'Import id'},rowId:{type:'string',description:'Row id from status'}},required:['id','rowId']}},
+  {name:'confirm-import-account',description:'For needs_confirmation rows ONLY: show the actual account id/name and CSV URL to the user. Call only after the user explicitly confirms they match. tokenId must come from status; this never creates a connection.',inputSchema:{type:'object',properties:{id:{type:'string',description:'Import id'},rowId:{type:'string',description:'Row id'},tokenId:{type:'string',description:'User-confirmed tokenId from status'}},required:['id','rowId','tokenId']}},
+
   // Posts
   {
     name: 'list-posts',
