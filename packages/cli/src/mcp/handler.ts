@@ -240,7 +240,7 @@ async function dispatchToolCall(
       return ok(result)
     }
     case 'create-kb': {
-      const result = await client.kb.create({ name: args.name as string })
+      const result = await client.kb.create({ name: args.name as string, description: args.description as string })
       return ok(result)
     }
     case 'delete-kb': {

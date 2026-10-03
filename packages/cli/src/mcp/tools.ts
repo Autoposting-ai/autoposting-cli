@@ -379,9 +379,10 @@ export const ALL_TOOLS: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Knowledge base name' },
+        name: { type: 'string', minLength: 4, maxLength: 20, description: 'Knowledge base name' },
+        description: { type: 'string', minLength: 20, maxLength: 500, description: 'Knowledge base description' },
       },
-      required: ['name'],
+      required: ['name', 'description'],
       additionalProperties: false,
     },
   },

@@ -151,7 +151,7 @@ describe('MCP tool definitions', () => {
         required: ['name', 'type', 'prompt', 'frequency'],
       },
       { tool: 'create-webhook', required: ['url', 'events'] },
-      { tool: 'create-kb', required: ['name'] },
+      { tool: 'create-kb', required: ['name', 'description'] },
       { tool: 'schedule-post', required: ['id', 'scheduledAt'] },
       { tool: 'search-kb', required: ['id', 'query'] },
     ]
@@ -170,6 +170,14 @@ describe('MCP tool definitions', () => {
 })
 
 describe('MCP tool handler', () => {
+  it('passes the required knowledge-base description to the SDK', async () => {
+    let captured: unknown
+    const args = { name: 'Product Docs', description: 'Verified product reference material.' }
+    const client = { kb: { create: async (params: unknown) => { captured = params; return { id: 'kb-1' } } } }
+    const result = await handleToolCall('create-kb', args, client as never)
+    expect(result.isError).not.toBe(true)
+    expect(captured).toEqual(args)
+  })
   it('parses comma-separated post platforms into SDK platform arrays', async () => {
     let captured: unknown
     const client = {

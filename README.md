@@ -183,7 +183,7 @@ ap brands list    # list all brands in your workspace
 |---------|-------------|
 | `ap kb list` | List all knowledge bases |
 | `ap kb get <id>` | Get KB details |
-| `ap kb create` | Create a new KB |
+| `ap kb create --name <name> --description <description>` | Create a KB (name: 4–20 characters; description: 20–500) |
 | `ap kb delete <id>` | Delete a KB (requires `--force`) |
 | `ap kb search <id>` | Search KB with a query |
 | `ap kb ingest <id>` | Ingest a URL into KB |

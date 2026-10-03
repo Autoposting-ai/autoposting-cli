@@ -131,7 +131,7 @@ const runs = await client.agents.runs(agent.id)
 
 ```typescript
 // Create a knowledge base and ingest content
-const kb = await client.kb.create({ name: 'Product Docs' })
+const kb = await client.kb.create({ name: 'Product Docs', description: 'Verified product reference material.' })
 await client.kb.ingest(kb.id, { url: 'https://docs.example.com' })
 
 // Search your knowledge base

@@ -17,6 +17,7 @@ export interface KbDocument {
 
 export interface CreateKbParams {
   name: string
+  description: string
 }
 
 /**
