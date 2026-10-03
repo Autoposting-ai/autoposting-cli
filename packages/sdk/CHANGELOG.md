@@ -1,5 +1,11 @@
 # @autoposting.ai/sdk
 
+## 0.4.1
+
+### Patch Changes
+
+- Require and forward the knowledge-base description already required by the production API. The CLI exposes --description and stdio MCP advertises it, so KB creation succeeds through both transports. SDK creation parameters and examples now include description.
+
 ## 0.4.0
 
 ## 0.3.6
