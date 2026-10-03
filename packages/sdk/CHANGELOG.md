@@ -1,5 +1,11 @@
 # @autoposting.ai/sdk
 
+## 0.5.0
+
+### Minor Changes
+
+- eaa9659: Connect CSV-listed social accounts from coding agents with durable workspace imports, resumable brand preparation, provider approval links, verified connection status and explicit vanity-account confirmation through CLI, SDK and MCP.
+
 ## 0.4.1
 
 ### Patch Changes
