@@ -1,6 +1,6 @@
 {
   "name": "@autoposting.ai/cli",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "license": "MIT",
   "bin": {
     "autoposting": "./dist/cli.cjs",
