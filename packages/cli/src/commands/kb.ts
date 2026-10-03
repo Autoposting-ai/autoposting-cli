@@ -68,19 +68,20 @@ export function createKbCommand(): Command {
       }
     })
 
-  // ap kb create --name <name>
+  // ap kb create --name <name> --description <description>
   kb
     .command('create')
     .description('Create a new knowledge base')
     .requiredOption('--name <name>', 'Knowledge base name')
-    .action(async (opts: { name: string }, cmd: Command) => {
+    .requiredOption('--description <description>', 'Knowledge base description (20–500 characters)')
+    .action(async (opts: { name: string; description: string }, cmd: Command) => {
       const globals = cmd.optsWithGlobals<GlobalOpts>()
       const printer = createPrinter(globals)
       const spinner = printer.spinner('Creating knowledge base…')
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        const result = await client.kb.create({ name: opts.name })
+        const result = await client.kb.create({ name: opts.name, description: opts.description })
         spinner.stop()
         printer.log(result)
       } catch (err) {

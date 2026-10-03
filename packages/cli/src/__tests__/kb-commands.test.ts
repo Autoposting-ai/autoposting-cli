@@ -60,6 +60,13 @@ describe('ap kb get', () => {
 })
 
 describe('ap kb create', () => {
+  it('requires a description instead of sending a request the API cannot accept', async () => {
+    const result = await ap(['kb', 'create', '--name', 'Product Docs'], {
+      ...baseEnv, AUTOPOSTING_API_KEY: 'sk-test', AUTOPOSTING_BASE_URL: 'http://127.0.0.1:1',
+    })
+    expect(result.exitCode).not.toBe(0)
+    expect(result.stderr).toContain('--description')
+  })
   it('exits with error when --name is missing', async () => {
     const result = await ap(['kb', 'create'], {
       ...baseEnv,

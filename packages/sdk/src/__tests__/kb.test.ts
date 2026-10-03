@@ -56,7 +56,7 @@ describe('kb.retrieve()', () => {
 })
 
 describe('kb.create()', () => {
-  it('sends POST /kbs with name and returns kb', async () => {
+  it('sends POST /kbs with name and required description and returns kb', async () => {
     let capturedBody: unknown = null
     server.use(
       http.post(`${BASE}/kbs`, async ({ request }) => {
@@ -64,8 +64,9 @@ describe('kb.create()', () => {
         return HttpResponse.json(wrap(mockKb), { status: 201 })
       }),
     )
-    const result = await makeClient().kb.create({ name: 'Marketing KB' })
-    expect(capturedBody).toEqual({ name: 'Marketing KB' })
+    const params = { name: 'Marketing KB', description: 'Verified product reference material.' }
+    const result = await makeClient().kb.create(params)
+    expect(capturedBody).toEqual(params)
     expect(result).toEqual(mockKb)
   })
 })
