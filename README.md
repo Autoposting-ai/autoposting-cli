@@ -311,6 +311,8 @@ MCP equivalents: `import-accounts`, `prepare-account-import`, `account-import-st
 | Piped / `--json` / `--format json` | Clean JSON output |
 | `--quiet` | Suppress spinners, errors only |
 
+`usage summary` and `billing credits` emit one complete response object in machine mode, including source breakdowns and recent credit usage. Use `--jq` to select fields from that object.
+
 ---
 
 ## SDK

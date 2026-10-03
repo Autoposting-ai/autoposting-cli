@@ -33,6 +33,10 @@ export function createUsageCommand(): Command {
         const client = new Autoposting({ apiKey: cred.apiKey })
         const summary = await client.usage.summary()
         spinner.stop()
+        if (!printer.isTty()) {
+          printer.log(summary)
+          return
+        }
         printer.log(`Period: ${summary.range.from.slice(0, 10)} → ${summary.range.to.slice(0, 10)}`)
         printer.table(
           [
