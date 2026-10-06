@@ -325,3 +325,20 @@ it('forwards future Facebook recovery and rejects unsupported scheduling platfor
   expect(invalid.isError).toBe(true)
   expect(calls).toHaveLength(1)
 })
+
+it('preserves an intentionally empty main caption when updating a Facebook photo', async () => {
+  const calls: unknown[] = []
+  const client = { posts: { update: async (_id: string, body: unknown) => {
+    calls.push(body)
+    return { id: 'post' }
+  } } }
+  const result = await handleToolCall('update-post', {
+    id: 'post', text: '', platforms: ['facebook'],
+    facebookOptions: { format: 'photo' }, targetAccountIds: { facebook: ['page'] },
+  }, client as never)
+  expect(result.isError).not.toBe(true)
+  expect(calls).toEqual([{
+    text: '', platforms: ['facebook'],
+    facebookOptions: { format: 'photo' }, targetAccountIds: { facebook: ['page'] },
+  }])
+})

@@ -23,7 +23,7 @@ describe('compiled Facebook MCP stdio contract', () => {
       const image = { url: 'https://example.com/photo.png', type: 'image' }
       const media = format === 'photo' ? [image] : format === 'multi-photo' ? [image, { ...image, url: 'https://example.com/photo-2.png' }] :
         ['video', 'reel'].includes(format) ? [{ url: 'https://example.com/video.mp4', type: 'video' }] : []
-      const intent = { brandSlug: 'brand', text: 'Caption', platforms: ['facebook'],
+      const intent = { brandSlug: 'brand', text: format === 'text' ? 'Caption' : '', platforms: ['facebook'],
         facebookOptions: { format, ...(format === 'link' ? { link: 'https://example.com/article' } : {}) },
         targetAccountIds: { facebook: ['page'] }, platformTexts: { facebook: format === 'text' ? 'Caption' : '' }, platformMedia: { facebook: media } }
       const result = await client.callTool({ name: 'create-post', arguments: intent })

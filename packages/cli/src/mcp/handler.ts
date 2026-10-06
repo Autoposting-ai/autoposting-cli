@@ -163,7 +163,7 @@ async function dispatchToolCall(
     }
     case 'update-post': {
       const result = await client.posts.update(args.id as string, {
-        ...(args.text ? { text: args.text as string } : {}),
+        ...(args.text !== undefined ? { text: args.text as string } : {}),
         ...(args.platforms
           ? {
               platforms: parsePlatforms(args.platforms),
