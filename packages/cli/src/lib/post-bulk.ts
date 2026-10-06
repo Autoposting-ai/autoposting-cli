@@ -5,10 +5,11 @@ import { buildAndCreatePost, type PostFields } from './post-create.js'
 
 export interface BulkRecordResult {
   index: number
-  status: 'created' | 'failed'
+  status: 'created' | 'failed' | 'previewed'
   id: string
   text: string
   error: string
+  request?: unknown
 }
 
 /**
@@ -150,15 +151,16 @@ function rowToFields(row: Record<string, unknown>, cliBrand?: string): PostField
 export async function createPostsBulk(
   client: Autoposting,
   rows: Record<string, unknown>[],
-  opts: { cliBrand?: string } = {},
+  opts: { cliBrand?: string; dryRun?: boolean } = {},
 ): Promise<BulkRecordResult[]> {
   const results: BulkRecordResult[] = []
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]!
     try {
       const fields = rowToFields(row, opts.cliBrand)
-      const created = (await buildAndCreatePost(client, fields, { isTty: false })) as { id?: string }
-      results.push({ index: i, status: 'created', id: created?.id ?? '', text: fields.text, error: '' })
+      const created = (await buildAndCreatePost(client, fields, { isTty: false, dryRun: opts.dryRun })) as { id?: string; request?: unknown }
+      results.push({ index: i, status: opts.dryRun ? 'previewed' : 'created', id: created?.id ?? '', text: fields.text, error: '',
+        ...(opts.dryRun ? { request: created.request } : {}) })
     } catch (err) {
       results.push({
         index: i,

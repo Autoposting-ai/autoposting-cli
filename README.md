@@ -105,6 +105,9 @@ ap posts create --brand my-brand --text "Preview me" --platforms x --dry-run
 # Bulk create — one post per row from a JSON array or CSV
 ap posts create --from posts.csv
 
+# Preview every bulk row without uploads or post creation (--preview is an alias)
+ap posts create --from posts.json --dry-run
+
 # Schedule it (or --cancel to unschedule back to draft)
 ap posts schedule <post-id> --at "2025-01-15T09:00:00Z"
 ap posts schedule <post-id> --cancel

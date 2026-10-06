@@ -190,7 +190,13 @@ export function createPostsCommand(): Command {
             const rows = parseBulkFile(opts.from)
             const records = await createPostsBulk(client, rows, {
               cliBrand: resolveBrand(opts.brand) ?? undefined,
+              dryRun: opts.dryRun || opts.preview,
             })
+            if (opts.dryRun || opts.preview) {
+              printer.log(records)
+              if (records.some((r) => r.status === 'failed')) process.exit(1)
+              return
+            }
             // Truncate text only for the human table; JSON/jq/quiet keep it full
             // (lossless echo for scripting consumers).
             const truncate = printer.isTty()
