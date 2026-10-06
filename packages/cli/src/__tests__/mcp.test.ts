@@ -268,3 +268,60 @@ describe('MCP tool handler', () => {
     ])
   })
 })
+
+describe('Facebook local MCP retry', () => {
+  it('forwards explicit Facebook selection and retains safe recovery results', async () => {
+    expect(ALL_TOOLS.find(tool => tool.name === 'retry-post')?.inputSchema.properties?.platform).toMatchObject({ type: 'string' })
+    const calls: unknown[] = []
+    const accepted = { id: 'post', status: 'publishing', retrying: ['facebook'], pageIds: ['failed-page'] }
+    const client = { posts: { retry: async (...args: unknown[]) => { calls.push(args); return accepted } } }
+    const result = await handleToolCall('retry-post', { id: 'post', platform: 'facebook' }, client as never)
+    expect(calls).toEqual([['post', 'facebook']])
+    expect(result.content[0]).toMatchObject({ type: 'text', text: JSON.stringify(accepted, null, 2) })
+  })
+})
+
+describe('Facebook local MCP authoring', () => {
+  it.each([
+    { facebookOptions: null },
+    { facebookOptions: { format: 'story' } },
+    { facebookOptions: { format: 'link', link: 42 } },
+    { targetAccountIds: { facebook: [] } },
+    { targetAccountIds: { facebook: ['page', 'page'] } },
+    { platformTexts: { facebook: null } },
+    { platformMedia: { facebook: [{}] } },
+  ])('rejects malformed authoring intent before dispatch: %j', async (intent) => {
+    const calls: unknown[] = []
+    const client = { posts: { create: async (body: unknown) => { calls.push(body); return {} },
+      update: async (_id: string, body: unknown) => { calls.push(body); return {} } } }
+    for (const tool of ['create-post', 'update-post']) {
+      const result = await handleToolCall(tool, { id: 'post', brandSlug: 'brand', text: 'Caption', platforms: ['facebook'], ...intent }, client as never)
+      expect(result.isError).toBe(true)
+    }
+    expect(calls).toEqual([])
+  })
+  it.each(['create-post', 'update-post'])('advertises and forwards nested intent through %s', async (tool) => {
+    const properties = ALL_TOOLS.find(item => item.name === tool)?.inputSchema.properties as Record<string, any>
+    expect(properties.facebookOptions.properties.format.enum).toEqual(['text', 'link', 'photo', 'multi-photo', 'video', 'reel'])
+    expect(properties.targetAccountIds.properties.facebook.items.type).toBe('string')
+    const intent = { facebookOptions: { format: 'link', link: 'https://example.com/article' }, targetAccountIds: { facebook: ['page'] },
+      platformTexts: { facebook: '' }, platformMedia: { facebook: [] } }
+    const calls: unknown[] = []
+    const client = { posts: { create: async (body: unknown) => { calls.push(body); return { id: 'post' } },
+      update: async (_id: string, body: unknown) => { calls.push(body); return { id: 'post' } } } }
+    await handleToolCall(tool, { id: 'post', brandSlug: 'brand', text: 'Caption', platforms: ['facebook'], ...intent }, client as never)
+    expect(calls[0]).toMatchObject({ ...intent, platforms: ['facebook'] })
+  })
+})
+
+
+it('forwards future Facebook recovery and rejects unsupported scheduling platforms', async () => {
+  const calls: unknown[] = []
+  const client = { posts: { schedule: async (...args: unknown[]) => { calls.push(args); return { id: 'post', pageIds: ['page'] } } } }
+  const result = await handleToolCall('schedule-post', { id: 'post', scheduledAt: '2027-01-01T10:00:00Z', platform: 'facebook' }, client as never)
+  expect(result.isError).not.toBe(true)
+  expect(calls).toEqual([['post', '2027-01-01T10:00:00Z', 'facebook']])
+  const invalid = await handleToolCall('schedule-post', { id: 'post', scheduledAt: '2027-01-01T10:00:00Z', platform: 'x' }, client as never)
+  expect(invalid.isError).toBe(true)
+  expect(calls).toHaveLength(1)
+})

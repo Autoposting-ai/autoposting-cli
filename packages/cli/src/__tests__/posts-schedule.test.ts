@@ -62,6 +62,13 @@ describe.skipIf(!BINARY_EXISTS)('posts schedule (live stub)', () => {
   })
   const envWith = (url: string) => ({ ...baseEnv, AUTOPOSTING_BASE_URL: url })
 
+  it('--platform facebook forwards explicit future recovery', async () => {
+    api = await startMockApi()
+    const result = await ap(['posts', 'schedule', 'post-1', '--at', FUTURE, '--platform', 'facebook'], envWith(api.url))
+    expect(result.exitCode).toBe(0)
+    expect(findScheduleBody(api.requests)).toEqual({ scheduledAt: FUTURE, platform: 'facebook' })
+  })
+
   it('--cancel sends PUT /posts/:id/schedule with { cancel: true } and returns draft', async () => {
     api = await startMockApi()
     const result = await ap(['posts', 'schedule', 'post-1', '--cancel'], envWith(api.url))

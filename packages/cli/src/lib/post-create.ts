@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import nodePath from 'node:path'
-import type { Autoposting, MediaInput, Platform } from '@autoposting.ai/sdk'
+import type { Autoposting, MediaInput, Platform, FacebookOptions } from '@autoposting.ai/sdk'
 import {
   extToMime,
   parsePairs,
@@ -15,7 +15,7 @@ import {
 } from './media-flags.js'
 import { resolveTargetAccounts } from './account-select.js'
 
-const VALID_PLATFORMS: readonly Platform[] = ['x', 'linkedin', 'instagram', 'threads', 'youtube']
+const VALID_PLATFORMS: readonly Platform[] = ['x', 'linkedin', 'instagram', 'threads', 'youtube', 'facebook']
 
 export function parsePlatforms(raw: string): Platform[] {
   const parts = raw.split(',').map((p) => p.trim()).filter(Boolean)
@@ -51,6 +51,16 @@ export function validateScheduledAt(value: string): string {
   return value
 }
 
+function validateCanonicalMedia(items: MediaInput[]): void {
+  for (const item of items) {
+    if (!item || typeof item !== 'object' || typeof item.url !== 'string' || !['image', 'video', 'gif'].includes(item.type)) throw new Error('Media items require a URL and supported type')
+    let url: URL
+    try { url = new URL(item.url) } catch { throw new Error('Media URL must use HTTPS') }
+    if (url.protocol !== 'https:' || url.username || url.password) throw new Error('Media URL must use credential-free HTTPS')
+    if (item.altText !== undefined && typeof item.altText !== 'string') throw new Error('Media altText must be a string')
+  }
+}
+
 /** One post's inputs — same field names as `posts create` opts, brand already resolved. */
 export interface PostFields {
   brandSlug: string
@@ -58,10 +68,10 @@ export interface PostFields {
   platforms: string
   at?: string
   thread?: string[]
-  media?: string[]
+  media?: string[] | MediaInput[]
   altText?: string[]
   platformText?: string[]
-  platformMedia?: string[]
+  platformMedia?: string[] | Partial<Record<Platform, MediaInput[]>>
   ytTitle?: string
   ytDescription?: string
   ytTags?: string
@@ -75,6 +85,8 @@ export interface PostFields {
   igCollaborators?: string
   threadsReplyTo?: string
   threadsReplyControl?: string
+  facebookFormat?: string
+  facebookLink?: string
   account?: string[]
 }
 
@@ -102,10 +114,15 @@ export async function buildAndCreatePost(
   const platforms = parsePlatforms(fields.platforms)
   const scheduledAt = fields.at ? validateScheduledAt(fields.at) : undefined
 
-  if (fields.media && fields.media.length > 0) {
-    validateMediaCount(fields.media)
-    validateMediaPaths(fields.media)
-    validateMediaExtensions(fields.media)
+  const sharedMedia = fields.media ?? []
+  if (!Array.isArray(sharedMedia)) throw new Error('media must be an array')
+  const localMedia = sharedMedia.every(item => typeof item === 'string') ? sharedMedia as string[] : []
+  const sharedCanonicalMedia = localMedia.length || !sharedMedia.length ? [] : sharedMedia as MediaInput[]
+  validateCanonicalMedia(sharedCanonicalMedia)
+  if (localMedia.length) {
+    validateMediaCount(localMedia)
+    validateMediaPaths(localMedia)
+    validateMediaExtensions(localMedia)
   }
 
   const platformTexts =
@@ -113,16 +130,50 @@ export async function buildAndCreatePost(
       ? parsePairs('--platform-text', fields.platformText)
       : undefined
 
+  const suppliedMedia = fields.platformMedia
+  const canonicalMedia: Partial<Record<Platform, MediaInput[]>> = {}
+  if (suppliedMedia !== undefined && !Array.isArray(suppliedMedia)) {
+    if (!suppliedMedia || typeof suppliedMedia !== 'object') throw new Error('platformMedia must be an object or local path flags')
+    for (const [platform, items] of Object.entries(suppliedMedia)) {
+      if (!VALID_PLATFORMS.includes(platform as Platform) || !Array.isArray(items)) throw new Error('platformMedia requires supported platforms and media arrays')
+      validateCanonicalMedia(items)
+      canonicalMedia[platform as Platform] = items
+    }
+  }
   const platformMediaPaths =
-    fields.platformMedia && fields.platformMedia.length > 0
-      ? parsePlatformMediaPairs('--platform-media', fields.platformMedia)
+    Array.isArray(suppliedMedia) && suppliedMedia.length > 0
+      ? parsePlatformMediaPairs('--platform-media', suppliedMedia)
       : {}
   for (const paths of Object.values(platformMediaPaths)) {
     validateMediaPaths(paths)
     validateMediaExtensions(paths)
   }
 
-  const altTexts = alignAltText(fields.media ?? [], fields.altText ?? [])
+  let facebookOptions: FacebookOptions | undefined
+  if (platforms.includes('facebook')) {
+    const format = fields.facebookFormat
+    if (!format || !['text', 'link', 'photo', 'multi-photo', 'video', 'reel'].includes(format)) {
+      throw new Error('--facebook-format must be text, link, photo, multi-photo, video or reel')
+    }
+    const paths = canonicalMedia.facebook ?? platformMediaPaths.facebook ?? fields.media ?? []
+    const images = paths.every(item => typeof item === 'string' ? extToMime(item).startsWith('image/') : item.type === 'image')
+    const videos = paths.every(item => typeof item === 'string' ? extToMime(item).startsWith('video/') : item.type === 'video')
+    if ((format === 'text' || format === 'link') && paths.length ||
+      format === 'photo' && (paths.length !== 1 || !images) ||
+      format === 'multi-photo' && (paths.length < 2 || !images) ||
+      (format === 'video' || format === 'reel') && (paths.length !== 1 || !videos)) {
+      throw new Error('Facebook attachments do not match --facebook-format')
+    }
+    if (format === 'text' && !(platformTexts?.facebook ?? fields.text).trim()) throw new Error('Facebook text format requires a caption')
+    if (format === 'link') {
+      let link: URL
+      try { link = new URL(fields.facebookLink ?? '') } catch { throw new Error('--facebook-link must be a public HTTPS URL') }
+      if (link.protocol !== 'https:' || link.username || link.password) throw new Error('--facebook-link must be a public HTTPS URL')
+    }
+    facebookOptions = { format: format as FacebookOptions['format'], ...(format === 'link' ? { link: fields.facebookLink } : {}) }
+  }
+
+  const altTexts = alignAltText(localMedia, fields.altText ?? [])
 
   const youtubeOptions = buildYoutubeOptions({
     ytTitle: fields.ytTitle,
@@ -165,6 +216,7 @@ export async function buildAndCreatePost(
     ...(instagramOptions ? { instagramOptions } : {}),
     ...(threadsOptions ? { threadsOptions } : {}),
     ...(youtubeOptions ? { youtubeOptions } : {}),
+    ...(facebookOptions ? { facebookOptions } : {}),
     source: 'cli' as const,
   }
 
@@ -176,13 +228,13 @@ export async function buildAndCreatePost(
         ...common,
         ...(fields.media && fields.media.length > 0
           ? {
-              media: fields.media.map((path, i) => ({
+              media: sharedCanonicalMedia.length ? sharedCanonicalMedia : localMedia.map((path, i) => ({
                 path,
                 ...(altTexts[i] ? { altText: altTexts[i] } : {}),
               })),
             }
           : {}),
-        ...(Object.keys(platformMediaPaths).length > 0 ? { platformMedia: platformMediaPaths } : {}),
+        ...(Object.keys(platformMediaPaths).length + Object.keys(canonicalMedia).length > 0 ? { platformMedia: { ...canonicalMedia, ...platformMediaPaths } } : {}),
       },
     }
   }
@@ -190,9 +242,9 @@ export async function buildAndCreatePost(
   opts.onBeforeNetwork?.()
 
   // Upload global media.
-  const mediaInputs: MediaInput[] = []
-  for (let i = 0; i < (fields.media ?? []).length; i++) {
-    const filePath = fields.media![i]!
+  const mediaInputs: MediaInput[] = [...sharedCanonicalMedia]
+  for (let i = 0; i < localMedia.length; i++) {
+    const filePath = localMedia[i]!
     const data = await fs.readFile(filePath)
     const filename = nodePath.basename(filePath)
     const uploaded = await client.media.upload({
@@ -208,7 +260,7 @@ export async function buildAndCreatePost(
   }
 
   // Upload per-platform media.
-  const platformMediaResult: Partial<Record<Platform, MediaInput[]>> = {}
+  const platformMediaResult: Partial<Record<Platform, MediaInput[]>> = { ...canonicalMedia }
   for (const [p, paths] of Object.entries(platformMediaPaths) as [Platform, string[]][]) {
     const uploads: MediaInput[] = []
     for (const filePath of paths) {

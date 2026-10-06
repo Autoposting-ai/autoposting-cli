@@ -91,6 +91,9 @@ ap posts create --brand my-brand --text "Hello from the terminal!" --platforms x
 ap posts create --brand my-brand --text "Ship day 🚀" --platforms x \
   --media chart.png demo.mp4 --alt-text "Q2 chart"
 
+# Facebook Page targets are always explicit, including a sole connected Page.
+# Multiple Page IDs use --account facebook=page-id-1,page-id-2.
+
 # Pick a specific account when a brand has several of one platform
 # (or =all to fan out to every connected account — prints the resolved count)
 ap posts create --brand my-brand --text "Update" --platforms linkedin \
@@ -136,7 +139,7 @@ ap brands list    # list all brands in your workspace
 | `ap posts list` | List posts (filter by brand, status, page) |
 | `ap posts get <id>` | Get a post by ID |
 | `ap posts create` | Create a draft (media, per-platform text/options, account selector; `--dry-run` to preview; `--from <file>` for bulk) |
-| `ap posts update <id>` | Update text, platforms, or schedule |
+| `ap posts update <id>` | Update text, platforms, or schedule; `--from <file>` accepts a JSON update object with Facebook options, Page targets, captions and media URLs |
 | `ap posts delete <id>` | Delete a post (requires `--force`) |
 | `ap posts publish <id>` | Publish immediately |
 | `ap posts schedule <id>` | Schedule for a specific time (`--at`), or `--cancel` to unschedule |
@@ -144,7 +147,11 @@ ap brands list    # list all brands in your workspace
 | `ap posts rewrite <id>` | AI-rewrite post text |
 | `ap posts score <id>` | AI-score with feedback |
 
+Bulk JSON rows can use `platformMedia` objects containing existing HTTPS media URLs, for example `{"facebook":[{"url":"https://example.com/photo.png","type":"image"}]}`. These URLs are forwarded without another upload. An explicit `{"facebook":[]}` keeps Facebook free of shared media. Local file flags remain supported. Set the matching `facebookOptions.format` and explicit `targetAccountIds.facebook` for Facebook rows.
+
 ### Account CSV onboarding
+
+For Facebook Pages, run `ap brands connect-facebook BRAND_SLUG` to open the app. Sign in to the intended workspace, expand the brand, check beta access and use its Facebook connection action to authorize and select Pages. `--no-browser` prints the link for manual opening. Check completion with `ap brands auth-status BRAND_SLUG`; opening the browser does not mean a Page is connected.
 
 Import brands and account URLs, then let Codex / Claude Code prepare brands and present provider approval links:
 

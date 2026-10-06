@@ -201,3 +201,21 @@ describe.skipIf(!BINARY_EXISTS)('posts create media extension validation is fail
     expect(api.requests.length).toBe(0)
   })
 })
+
+describe('compiled Facebook create command', () => {
+  it.each([false, true])('forwards selected Pages and link format with dryRun=%s', async (dryRun) => {
+    const api = await startMockApi({ accounts: [{ platform: 'facebook', platformUserId: 'page' }] })
+    try {
+      const result = await ap(['posts', 'create', '--brand', 'my-brand', '--text', 'Caption', '--platforms', 'facebook',
+        '--facebook-format', 'link', '--facebook-link', 'https://example.com/article', '--account', 'facebook=page',
+        '--json', ...(dryRun ? ['--dry-run'] : [])], { ...baseEnv, AUTOPOSTING_BASE_URL: api.url })
+      expect(result.exitCode, result.stderr).toBe(0)
+      const expected = { facebookOptions: { format: 'link', link: 'https://example.com/article' }, targetAccountIds: { facebook: ['page'] } }
+      if (dryRun) {
+        expect(result.stdout).toContain('facebookOptions')
+        expect(api.requests.every(request => request.method === 'GET')).toBe(true)
+      } else expect(findCreateBody(api.requests)).toMatchObject(expected)
+      expect(api.requests.some(request => request.path.includes('/media/upload'))).toBe(false)
+    } finally { await api.close() }
+  })
+})

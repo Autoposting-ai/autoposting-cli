@@ -16,7 +16,14 @@ export interface PlatformConnection {
   // Backend field names (proven against GET /brands/:slug/auth/status).
   platformUsername?: string
   platformUserId?: string
-  platformAccountType?: 'personal' | 'organization'
+  platformAccountType?: 'personal' | 'organization' | 'page'
+  tokenId?: string
+  pageName?: string
+  pagePictureUrl?: string
+  scopes?: string[]
+  hasRefreshToken?: boolean
+  connectedAt?: string
+  refreshFailedAt?: string
   profileImageUrl?: string
   expiresAt?: string
   refreshError?: string

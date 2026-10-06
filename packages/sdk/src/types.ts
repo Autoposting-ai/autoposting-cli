@@ -1,4 +1,4 @@
-export type Platform = 'x' | 'linkedin' | 'instagram' | 'threads' | 'youtube'
+export type Platform = 'x' | 'linkedin' | 'instagram' | 'threads' | 'youtube' | 'facebook'
 
 /**
  * The list envelope the backend emits for paginated resources (agents, agent runs,

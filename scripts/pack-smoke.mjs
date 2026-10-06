@@ -11,6 +11,7 @@ function run(command, args, options = {}) {
     cwd: options.cwd ?? repoRoot,
     encoding: 'utf8',
     stdio: options.stdio ?? ['ignore', 'pipe', 'pipe'],
+    env: options.env ?? process.env,
   })
   return typeof output === 'string' ? output.trim() : ''
 }
@@ -46,6 +47,14 @@ try {
   if (!/^\d+\.\d+\.\d+/.test(version)) {
     throw new Error(`CLI version output is invalid: ${version}`)
   }
+
+  run('npm', ['test', '--workspace=@autoposting.ai/cli', '--', 'src/__tests__/mcp-stdio.test.ts', '--maxWorkers=1', '--no-file-parallelism'], {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      AUTOPOSTING_TEST_CLI: path.join(installDir, 'node_modules', '@autoposting.ai', 'cli', 'dist', 'cli.cjs'),
+    },
+  })
 
   console.log(`Pack smoke passed for SDK and CLI (${version}).`)
 } finally {

@@ -9,6 +9,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
+import { startMockApi } from './helpers/mock-api-server.js'
 
 const CLI = path.resolve(__dirname, '../../dist/cli.cjs')
 
@@ -30,6 +31,24 @@ function ap(args: string[], env: NodeJS.ProcessEnv = baseEnv) {
 }
 
 describe('ap brands --help', () => {
+  it('prints a credential-free Facebook handoff after checking brand access', async () => {
+    const api = await startMockApi()
+    try {
+      const result = await ap(['brands', 'connect-facebook', 'my-brand', '--no-browser', '--json'], {
+        ...baseEnv, AUTOPOSTING_API_KEY: 'fixture-key', AUTOPOSTING_BASE_URL: api.url,
+      })
+      expect(result.exitCode, result.stderr).toBe(0)
+      expect(JSON.parse(result.stdout)).toEqual({ url: `${api.url}/brands?brand=my-brand&platform=facebook`, brandSlug: 'my-brand', platform: 'facebook' })
+      expect(result.stdout).not.toContain('fixture-key')
+      expect(api.requests.map(request => `${request.method} ${request.path}`)).toEqual(['GET /brands/my-brand'])
+    } finally { await api.close() }
+  })
+  it('advertises Facebook browser connection and manual-open fallback', async () => {
+    const result = await ap(['brands', 'connect-facebook', '--help'])
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('--no-browser')
+    expect(result.stdout).toContain('Page')
+  })
   it('lists all subcommands', async () => {
     const result = await ap(['brands', '--help'])
     expect(result.exitCode).toBe(0)

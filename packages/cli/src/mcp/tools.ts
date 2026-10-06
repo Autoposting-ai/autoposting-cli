@@ -18,6 +18,18 @@ const MEDIA_ITEMS = {
   },
 }
 
+const FACEBOOK_AUTHORING = {
+  facebookOptions: { type: 'object', properties: {
+    format: { type: 'string', enum: ['text', 'link', 'photo', 'multi-photo', 'video', 'reel'] },
+    link: { type: 'string', description: 'Public HTTPS article URL for link format' },
+  }, required: ['format'], additionalProperties: false },
+  targetAccountIds: { type: 'object', description: 'Explicit selected connected Page IDs, including a sole Page',
+    properties: { facebook: { type: 'array', items: { type: 'string' }, minItems: 1, uniqueItems: true } },
+    additionalProperties: { type: 'array', items: { type: 'string' } } },
+  platformTexts: { type: 'object', additionalProperties: { type: 'string' }, description: 'Platform captions; empty Facebook caption is intentional' },
+  platformMedia: { type: 'object', additionalProperties: MEDIA_ITEMS, description: 'Platform media; empty Facebook array excludes shared attachments' },
+}
+
 export const ALL_TOOLS: Tool[] = [
   {name:'delete-account-import',description:'Delete import progress only. Connected accounts and brands remain. Ask the user before discarding their progress.',inputSchema:{type:'object',properties:{id:{type:'string',description:'Import id'}},required:['id']}},
   { name: 'import-accounts', description: 'Import 1–1000 social account rows from CSV. Headers: brand_name, platform, account_url; optional brand_slug, timezone, account_type. Returns a durable import id. Repeating the same import reuses progress. No passwords or provider tokens.', inputSchema: {type:'object',properties:{csv:{type:'string',maxLength:90000,description:'CSV contents, including header row'}},required:['csv']} },
@@ -66,14 +78,15 @@ export const ALL_TOOLS: Tool[] = [
         brandSlug: { type: 'string', description: 'Brand slug to post under' },
         text: { type: 'string', description: 'Post text content' },
         platforms: {
-          type: 'string',
-          description: 'Comma-separated platform list (e.g. x,linkedin)',
+          type: ['string', 'array'], items: { type: 'string' },
+          description: 'Platform array or comma-separated platform list (e.g. x,linkedin)',
         },
         scheduledAt: {
           type: 'string',
           description: 'ISO 8601 datetime to schedule the post',
         },
         media: MEDIA_ITEMS,
+        ...FACEBOOK_AUTHORING,
       },
       required: ['brandSlug', 'text', 'platforms'],
       additionalProperties: false,
@@ -87,9 +100,10 @@ export const ALL_TOOLS: Tool[] = [
       properties: {
         id: { type: 'string', description: 'Post ID' },
         text: { type: 'string', description: 'New post text' },
-        platforms: { type: 'string', description: 'Comma-separated new platform list' },
+        platforms: { type: ['string', 'array'], items: { type: 'string' }, description: 'Platform array or comma-separated new platform list' },
         scheduledAt: { type: 'string', description: 'New ISO 8601 scheduled datetime' },
         media: MEDIA_ITEMS,
+        ...FACEBOOK_AUTHORING,
       },
       required: ['id'],
       additionalProperties: false,
@@ -127,6 +141,7 @@ export const ALL_TOOLS: Tool[] = [
       properties: {
         id: { type: 'string', description: 'Post ID to schedule' },
         scheduledAt: { type: 'string', description: 'ISO 8601 datetime for publishing' },
+        platform: { type: 'string', enum: ['facebook'], description: 'Explicit failed-Page recovery; preserves Published and Unknown outcomes' },
       },
       required: ['id', 'scheduledAt'],
       additionalProperties: false,
@@ -139,6 +154,7 @@ export const ALL_TOOLS: Tool[] = [
       type: 'object',
       properties: {
         id: { type: 'string', description: 'Post ID to retry' },
+        platform: { type: 'string', enum: ['x', 'linkedin', 'instagram', 'threads', 'youtube', 'facebook'], description: 'Optional explicit platform; facebook retries only failed Pages without remote evidence, preserving Published and Unknown outcomes.' },
       },
       required: ['id'],
       additionalProperties: false,

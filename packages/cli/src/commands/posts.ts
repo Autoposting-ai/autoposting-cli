@@ -1,5 +1,7 @@
 import { Command } from 'commander'
+import { readFile } from 'node:fs/promises'
 import { Autoposting, NotFoundError } from '@autoposting.ai/sdk'
+import type { UpdatePostParams } from '@autoposting.ai/sdk'
 import { resolveAuth } from '../auth/auth-manager.js'
 import { createPrinter } from '../output/printer.js'
 import type { Spinner } from '../output/spinner.js'
@@ -133,7 +135,9 @@ export function createPostsCommand(): Command {
     .option('--threads-reply-to <id>', 'Threads post ID to reply to')
     .option('--threads-reply-control <v>', 'Threads reply control (everyone|accounts_you_follow|mentioned_only)')
     // v0.3.3 — account selector
-    .option('--account <p=handle|id...>', 'Target specific account per platform, e.g. x=@handle')
+    .option('--facebook-format <format>', 'Facebook Pages: text|link|photo|multi-photo|video|reel')
+    .option('--facebook-link <url>', 'Public HTTPS article URL for Facebook link format')
+    .option('--account <p=handle|id...>', 'Target specific account per platform, e.g. x=@handle; Facebook Page lists: facebook=page-id-1,page-id-2')
     // v0.3.4 — preview the resolved request without uploading or posting
     .option('--dry-run', 'Print the resolved request body without uploading media or creating the post')
     .option('--preview', 'Alias for --dry-run')
@@ -164,6 +168,8 @@ export function createPostsCommand(): Command {
           igCollaborators?: string
           threadsReplyTo?: string
           threadsReplyControl?: string
+          facebookFormat?: string
+          facebookLink?: string
           account?: string[]
           dryRun?: boolean
           preview?: boolean
@@ -248,13 +254,14 @@ export function createPostsCommand(): Command {
   posts
     .command('update <id>')
     .description('Update a post')
+    .option('--from <file>', 'JSON update object with formats, target account IDs, captions and media URLs; explicit flags override file fields')
     .option('--text <text>', 'New post text')
     .option('--platforms <list>', 'New comma-separated platforms')
     .option('--at <iso>', 'New scheduled date/time (ISO 8601)')
     .action(
       async (
         id: string,
-        opts: { text?: string; platforms?: string; at?: string },
+        opts: { text?: string; platforms?: string; at?: string; from?: string },
         cmd: Command,
       ) => {
         const globals = cmd.optsWithGlobals<GlobalOpts>()
@@ -263,8 +270,26 @@ export function createPostsCommand(): Command {
         try {
           const cred = resolveAuth({ apiKey: globals.apiKey })
           const client = new Autoposting({ apiKey: cred.apiKey })
+          let patch: UpdatePostParams = {}
+          if (opts.from) {
+            const parsed: unknown = JSON.parse(await readFile(opts.from, 'utf8'))
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('--from requires one JSON update object')
+            const allowed = ['text', 'platforms', 'scheduledAt', 'media', 'platformMedia', 'platformTexts', 'targetAccountIds', 'facebookOptions']
+            if (Object.keys(parsed).some(key => !allowed.includes(key))) throw new Error('--from contains an unsupported update field')
+            patch = parsed as UpdatePostParams
+            if (patch.text !== undefined && typeof patch.text !== 'string') throw new Error('Update text must be a string')
+            if (patch.platforms !== undefined) {
+              if (!Array.isArray(patch.platforms) || patch.platforms.some(platform => typeof platform !== 'string' || !platform.trim() || platform.includes(','))) throw new Error('Update platforms must be an array of platform names')
+              patch.platforms = parsePlatforms(patch.platforms.join(','))
+            }
+            if (patch.scheduledAt !== undefined) {
+              if (typeof patch.scheduledAt !== 'string') throw new Error('Update scheduledAt must be an ISO datetime string')
+              patch.scheduledAt = validateScheduledAt(patch.scheduledAt)
+            }
+          }
           const post = await client.posts.update(id, {
-            ...(opts.text ? { text: opts.text } : {}),
+            ...patch,
+            ...(opts.text !== undefined ? { text: opts.text } : {}),
             ...(opts.platforms ? { platforms: parsePlatforms(opts.platforms) } : {}),
             ...(opts.at ? { scheduledAt: validateScheduledAt(opts.at) } : {}),
           })
@@ -337,8 +362,9 @@ export function createPostsCommand(): Command {
     .command('schedule <id>')
     .description('Schedule a post for a specific time, or --cancel to unschedule it')
     .option('--at <iso>', 'ISO 8601 datetime to schedule the post')
-    .option('--cancel', 'Unschedule the post (return it to draft)')
-    .action(async (id: string, opts: { at?: string; cancel?: boolean }, cmd: Command) => {
+    .option('--cancel', 'Cancel scheduling')
+    .option('--platform <platform>', 'facebook schedules only eligible failed Pages for recovery')
+    .action(async (id: string, opts: { at?: string; cancel?: boolean; platform?: string }, cmd: Command) => {
       const globals = cmd.optsWithGlobals<GlobalOpts>()
       const printer = createPrinter(globals)
       const spinner = printer.spinner(
@@ -352,11 +378,14 @@ export function createPostsCommand(): Command {
         if (!opts.cancel && !opts.at) {
           throw new Error('Provide either --at <iso> to schedule, or --cancel to unschedule.')
         }
+        if (opts.platform && (opts.platform !== 'facebook' || opts.cancel)) throw new Error('--platform facebook requires --at and cannot be used with --cancel.')
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
         const post = opts.cancel
           ? await client.posts.unschedule(id)
-          : await client.posts.schedule(id, validateScheduledAt(opts.at!))
+          : opts.platform === 'facebook'
+            ? await client.posts.schedule(id, validateScheduledAt(opts.at!), 'facebook')
+            : await client.posts.schedule(id, validateScheduledAt(opts.at!))
         spinner.stop()
         printer.log(post)
       } catch (err) {
@@ -370,14 +399,17 @@ export function createPostsCommand(): Command {
   posts
     .command('retry <id>')
     .description('Retry a failed post')
-    .action(async (id: string, _opts: Record<string, unknown>, cmd: Command) => {
+    .option('--platform <platform>', 'Select a platform; facebook retries only failed Pages without remote evidence')
+    .action(async (id: string, opts: { platform?: string }, cmd: Command) => {
       const globals = cmd.optsWithGlobals<GlobalOpts>()
       const printer = createPrinter(globals)
       const spinner = printer.spinner(`Retrying post "${id}"…`)
       try {
         const cred = resolveAuth({ apiKey: globals.apiKey })
         const client = new Autoposting({ apiKey: cred.apiKey })
-        const post = await client.posts.retry(id)
+        const platform = opts.platform ? parsePlatforms(opts.platform) : undefined
+        if (platform && platform.length !== 1) throw new Error('--platform requires exactly one platform')
+        const post = platform ? await client.posts.retry(id, platform[0]!) : await client.posts.retry(id)
         spinner.stop()
         printer.log(post)
       } catch (err) {

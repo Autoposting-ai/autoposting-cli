@@ -1,5 +1,6 @@
+import type { Platform } from '../types'
 import { Resource } from '../resource'
-import type { Post, CreatePostParams, UpdatePostParams, ListPostsParams } from '../types/posts'
+import type { Post, CreatePostParams, UpdatePostParams, ListPostsParams, FacebookRetryResult, FacebookRecoveryScheduleResult } from '../types/posts'
 
 // PostsResource methods `get` and `delete` cannot directly override the base class
 // protected generics (`get<T>`, `delete<T>`) due to TypeScript generic covariance rules.
@@ -41,17 +42,23 @@ export class PostsResource extends Resource {
     return this.client.request<Post>('POST', `/posts/${id}/publish`)
   }
 
-  schedule(id: string, scheduledAt: string): Promise<Post> {
-    return this.client.request<Post>('PUT', `/posts/${id}/schedule`, { scheduledAt })
+  schedule(id: string, scheduledAt: string): Promise<Post>
+  schedule(id: string, scheduledAt: string, platform: 'facebook'): Promise<FacebookRecoveryScheduleResult>
+  schedule(id: string, scheduledAt: string, platform?: 'facebook'): Promise<Post | FacebookRecoveryScheduleResult> {
+    return this.client.request<Post | FacebookRecoveryScheduleResult>('PUT', `/posts/${id}/schedule`, { scheduledAt, ...(platform ? { platform } : {}) })
   }
 
-  /** PUT /posts/:id/schedule with { cancel: true } — returns the post to draft. */
+  /** PUT /posts/:id/schedule with { cancel: true } — cancels scheduling; recovery restores the previous outcome. */
   unschedule(id: string): Promise<Post> {
     return this.client.request<Post>('PUT', `/posts/${id}/schedule`, { cancel: true })
   }
 
-  retry(id: string): Promise<Post> {
-    return this.client.request<Post>('POST', `/posts/${id}/retry`)
+  retry(id: string): Promise<Post>
+  retry(id: string, platform: 'facebook'): Promise<FacebookRetryResult>
+  retry(id: string, platform: Platform): Promise<Post | FacebookRetryResult>
+  retry(id: string, platform?: Platform): Promise<Post | FacebookRetryResult> {
+    return this.client.request<Post | FacebookRetryResult>('POST', `/posts/${id}/retry`, undefined,
+      platform ? { platform } : undefined)
   }
 
   rewrite(id: string): Promise<Post> {

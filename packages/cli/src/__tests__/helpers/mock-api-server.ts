@@ -38,7 +38,7 @@ export interface MockApi {
 
 const UPLOADED = { url: 'https://cdn.example/uploaded.png', type: 'image', filename: 'uploaded.png' }
 
-export async function startMockApi(opts: { accounts?: MockAccount[] } = {}): Promise<MockApi> {
+export async function startMockApi(opts: { accounts?: MockAccount[]; facebookRetryStatus?: 202 | 409 } = {}): Promise<MockApi> {
   const accounts = (opts.accounts ?? []).map((a) => ({ connected: true, ...a }))
   const requests: CapturedRequest[] = []
 
@@ -65,6 +65,16 @@ export async function startMockApi(opts: { accounts?: MockAccount[] } = {}): Pro
       }
 
       if (req.method === 'GET' && url.includes('/auth/status')) return send(accounts)
+      if (req.method === 'GET' && /\/brands\/[^/]+$/.test(url)) {
+        return send({ id: 'brand-1', slug: url.split('/').pop(), name: 'Fixture brand', platforms: [] })
+      }
+      if (req.method === 'PUT' && /\/posts\/[^/]+$/.test(url)) return send({ id: 'post-1', ...(jsonBody as object) })
+      if (req.method === 'POST' && url.endsWith('/retry?platform=facebook') && opts.facebookRetryStatus) {
+        if (opts.facebookRetryStatus === 202) return send({ id: 'post-1', status: 'publishing', retrying: ['facebook'], pageIds: ['failed-page'] }, 202)
+        res.writeHead(409, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ success: false, error: 'Unknown Facebook outcome cannot be retried' }))
+        return
+      }
       if (req.method === 'GET' && /\/posts(\?.*)?$/.test(url)) {
         return send([
           {
