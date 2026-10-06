@@ -48,6 +48,26 @@ describe.skipIf(!BINARY_EXISTS)('posts create --from bulk (N3)', () => {
   })
   const envWith = (url: string) => ({ ...baseEnv, AUTOPOSTING_BASE_URL: url })
 
+  it.each(['--dry-run', '--preview'])('%s previews bulk media without any writes', async (flag) => {
+    api = await startMockApi({ accounts: [{ platform: 'facebook', platformUserId: 'page-1' }] })
+    const image = write('slide.png', 'fixture image')
+    const file = write('preview.json', JSON.stringify([
+      { brand: 'my-brand', text: 'Caption', platforms: ['facebook'], facebookOptions: { format: 'photo' },
+        account: ['facebook=page-1'], media: [image] },
+      { brand: 'my-brand', text: 'Second', platforms: ['x'] },
+    ]))
+    const result = await ap(['posts', 'create', '--from', file, flag], envWith(api.url))
+    expect(result.exitCode).toBe(0)
+    expect(api.requests.filter(r => r.method !== 'GET')).toEqual([])
+    const summary = JSON.parse(result.stdout)
+    expect(summary).toHaveLength(2)
+    expect(summary.every((r: { status: string }) => r.status === 'previewed')).toBe(true)
+    expect(summary[0].request).toMatchObject({
+      facebookOptions: { format: 'photo' }, targetAccountIds: { facebook: ['page-1'] },
+    })
+    expect(summary[0].request.media[0].path).toBe(image)
+  })
+
   it('creates one post per JSON row and exits 0', async () => {
     api = await startMockApi()
     const file = write(

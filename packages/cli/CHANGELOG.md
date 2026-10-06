@@ -1,5 +1,12 @@
 # autoposting-cli
 
+## 0.5.3
+
+### Patch Changes
+
+- Honor --dry-run and --preview for bulk post creation. Resolve and print each row without uploading media or creating posts.
+  - @autoposting.ai/sdk@0.5.3
+
 ## 0.5.2
 
 ### Patch Changes
