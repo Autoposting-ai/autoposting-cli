@@ -8,10 +8,12 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { execa } from 'execa'
+import http from 'node:http'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
+import { startMockApi } from './helpers/mock-api-server.js'
 
 const CLI = path.resolve(__dirname, '../../dist/cli.cjs')
 
@@ -213,5 +215,72 @@ describe('ap posts score', () => {
     const result = await ap(['posts', 'score', 'post-123'])
     expect(result.exitCode).toBe(2)
     expect(result.stderr).toMatch(/No API key found/)
+  })
+})
+
+describe('Facebook retry command', () => {
+  it('advertises explicit platform selection and its Page safety boundary', async () => {
+    const result = await ap(['posts', 'retry', '--help'])
+    expect(result.exitCode).toBe(0)
+    expect(result.stdout).toContain('--platform')
+    expect(result.stdout).toContain('failed Pages')
+  })
+})
+
+describe('compiled Facebook update JSON contract', () => {
+  it.each([null, [], { status: 'published' }, { platforms: ['facebook,x'] }, { scheduledAt: '2000-01-01T00:00:00Z' }])('rejects malformed update files without requests: %j', async (patch) => {
+    const api = await startMockApi()
+    const file = path.join(tmpDir, 'invalid-update.json')
+    fs.writeFileSync(file, JSON.stringify(patch))
+    try {
+      const result = await ap(['posts', 'update', 'post-1', '--from', file, '--json'], {
+        ...baseEnv, AUTOPOSTING_API_KEY: 'fixture-key', AUTOPOSTING_BASE_URL: api.url,
+      })
+      expect(result.exitCode).not.toBe(0)
+      expect(api.requests).toHaveLength(0)
+    } finally { await api.close() }
+  })
+  it('forwards explicit format, Page IDs and empty overrides through an update file', async () => {
+    const api = await startMockApi()
+    const patch = { facebookOptions: { format: 'text' }, targetAccountIds: { facebook: ['page'] },
+      platformTexts: { facebook: 'Edited caption', x: 'Preserved caption' }, platformMedia: { facebook: [] } }
+    const file = path.join(tmpDir, 'update.json')
+    fs.writeFileSync(file, JSON.stringify(patch))
+    try {
+      const result = await ap(['posts', 'update', 'post-1', '--from', file, '--json'], {
+        ...baseEnv, AUTOPOSTING_API_KEY: 'fixture-key', AUTOPOSTING_BASE_URL: api.url,
+      })
+      expect(result.exitCode, result.stdout + result.stderr).toBe(0)
+      expect(api.requests).toHaveLength(1)
+      expect(api.requests[0]).toMatchObject({ method: 'PUT', path: '/posts/post-1', jsonBody: patch })
+    } finally { await api.close() }
+  })
+})
+
+describe('compiled Facebook retry HTTP contract', () => {
+  it.each([202, 409])('forwards explicit selection once and preserves HTTP %s behavior', async (status) => {
+    const paths: string[] = []
+    const server = http.createServer((request, response) => {
+      paths.push(`${request.method} ${request.url}`)
+      response.writeHead(status, { 'content-type': 'application/json' })
+      response.end(JSON.stringify(status === 202 ? { success: true, data: { id: 'post', status: 'publishing', retrying: ['facebook'], pageIds: ['failed-page'] } } :
+        { success: false, error: 'Unknown Facebook outcome cannot be retried' }))
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    try {
+      const address = server.address()
+      if (!address || typeof address === 'string') throw new Error('Missing fixture address')
+      const result = await ap(['posts', 'retry', 'post', '--platform', 'facebook', '--json'], {
+        ...baseEnv, AUTOPOSTING_API_KEY: 'fixture-key', AUTOPOSTING_BASE_URL: `http://127.0.0.1:${address.port}`,
+      })
+      expect(paths).toEqual(['POST /posts/post/retry?platform=facebook'])
+      if (status === 202) {
+        expect(result.exitCode, result.stderr).toBe(0)
+        expect(result.stdout).toContain('failed-page')
+      } else {
+        expect(result.exitCode).not.toBe(0)
+        expect(result.stdout + result.stderr).toContain('Unknown Facebook outcome cannot be retried')
+      }
+    } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
   })
 })

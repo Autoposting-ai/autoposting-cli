@@ -119,3 +119,35 @@ describe('resolveTargetAccounts saved-default fallback (M5)', () => {
     expect(result.x).toEqual(['x-1'])
   })
 })
+
+describe('explicit Facebook Page selection', () => {
+  const page = { platform: 'facebook', connected: true, platformUserId: 'page', platformUsername: 'Page' }
+  it('retains the explicitly selected sole Page ID', async () => {
+    expect(await resolveTargetAccounts({ brandSlug: 'facebook-brand', platforms: ['facebook'], accountFlags: ['facebook=page'],
+      client: fakeClient([page]), isTty: false })).toEqual({ facebook: ['page'] })
+  })
+  it('requires selection even with one connected Page in noninteractive mode', async () => {
+    await expect(resolveTargetAccounts({ brandSlug: 'facebook-brand', platforms: ['facebook'], accountFlags: [],
+      client: fakeClient([page]), isTty: false })).rejects.toThrow('--account')
+  })
+  it('rejects empty all selection when no Pages are connected', async () => {
+    await expect(resolveTargetAccounts({ brandSlug: 'facebook-brand', platforms: ['facebook'], accountFlags: ['facebook=all'],
+      client: fakeClient([]), isTty: false, emit: () => {} })).rejects.toThrow('Facebook')
+  })
+})
+
+describe('Facebook Page list selection', () => {
+  const connections = [
+    { platform: 'facebook', connected: true, platformUserId: 'page-1', platformUsername: 'First Page' },
+    { platform: 'facebook', connected: true, platformUserId: 'page-2', platformUsername: 'Second Page' },
+  ]
+  it('resolves ordered comma-separated Page IDs and removes duplicates', async () => {
+    expect(await resolveTargetAccounts({ brandSlug: 'facebook-list', platforms: ['facebook'],
+      accountFlags: ['facebook=page-2,page-1,page-2'], client: fakeClient(connections), isTty: false }))
+      .toEqual({ facebook: ['page-2', 'page-1'] })
+  })
+  it.each(['page-1,unknown', 'page-1,', ',page-1'])('rejects invalid or empty members in %s', async (value) => {
+    await expect(resolveTargetAccounts({ brandSlug: 'facebook-list', platforms: ['facebook'],
+      accountFlags: [`facebook=${value}`], client: fakeClient(connections), isTty: false })).rejects.toThrow('--account')
+  })
+})

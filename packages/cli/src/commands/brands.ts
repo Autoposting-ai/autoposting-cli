@@ -39,6 +39,32 @@ export function buildAuthStatusRow(c: PlatformConnection, now: number = Date.now
 export function createBrandsCommand(): Command {
   const brands = new Command('brands').description('Manage brands')
 
+  brands.command('connect-facebook <slug>')
+    .description('Open the app to connect Facebook Pages; sign in, check beta access and explicitly select Pages there')
+    .option('--no-browser', 'Print the application link without opening a browser')
+    .action(async (slug: string, opts: { browser: boolean }, cmd: Command) => {
+      const globals = cmd.optsWithGlobals<{ apiKey?: string; json?: boolean; quiet?: boolean; format?: 'table' | 'json' }>()
+      const printer = createPrinter(globals)
+      try {
+        const cred = resolveAuth({ apiKey: globals.apiKey })
+        const client = new Autoposting({ apiKey: cred.apiKey })
+        const handoff = await client.brands.facebookConnection(slug)
+        printer.log(handoff)
+        if (opts.browser) {
+          try {
+            const { default: open } = await import('open')
+            await open(handoff.url, { wait: true })
+          } catch {
+            printer.error(`Could not open the browser. Open ${handoff.url} manually, then check ap brands auth-status ${slug}.`)
+            process.exitCode = 1
+          }
+        }
+      } catch (error) {
+        printer.error(error as Error)
+        process.exitCode = exitCodeFromError(error)
+      }
+    })
+
   // ap brands list
   brands
     .command('list')

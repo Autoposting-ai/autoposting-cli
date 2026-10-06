@@ -4,7 +4,7 @@ import { getDefaultAccount } from '../auth/config-store.js'
 // PlatformConnection v0.3.3 already has platformUserId, platformAccountType, profileImageUrl.
 type AccountEntry = PlatformConnection
 
-const VALID_PLATFORMS: readonly Platform[] = ['x', 'linkedin', 'instagram', 'threads', 'youtube']
+const VALID_PLATFORMS: readonly Platform[] = ['x', 'linkedin', 'instagram', 'threads', 'youtube', 'facebook']
 
 // Fan-out (=all) larger than this prompts for confirmation on a TTY (M5).
 const FANOUT_CONFIRM_THRESHOLD = 5
@@ -32,7 +32,8 @@ export function needsFanoutConfirm(count: number, isTty: boolean, explicit: bool
  *  - value is a handle/id → resolve → push platformUserId (unknown → throw)
  *  - ≥2 connected accounts, TTY → checkbox multiselect via @inquirer/prompts
  *  - ≥2 connected accounts, non-TTY → throw with list + usage hint
- *  - 0 or 1 account → omit platform (backend defaults to all connected)
+ *  - Facebook requires explicit selection even with one Page; no connected Pages fail.
+ *  - Other platforms with 0 or 1 account omit the platform (existing backend default)
  */
 export async function resolveTargetAccounts({
   brandSlug,
@@ -112,28 +113,32 @@ export async function resolveTargetAccounts({
       }
       if (ids.length > 0) result[platform] = ids
     } else if (specifiedValue !== undefined) {
-      // Resolve handle (strip leading @, case-insensitive) or platformUserId.
-      const normalized = specifiedValue.startsWith('@') ? specifiedValue.slice(1) : specifiedValue
-      const match = accounts.find(
-        (a) =>
-          a.platformUsername?.toLowerCase() === normalized.toLowerCase() ||
-          a.platformUserId === specifiedValue,
-      )
-      if (!match?.platformUserId) {
-        const valid = accounts
-          .map((a) => `  @${a.platformUsername ?? '?'} (${a.platformUserId ?? '?'})`)
-          .join('\n')
-        throw Object.assign(
-          new Error(
-            `--account: unknown ${platform} account "${specifiedValue}".\n` +
-            `Connected accounts:\n${valid || '  (none)'}`,
-          ),
-          { exitCode: 1 },
+      const values = platform === 'facebook' ? specifiedValue.split(',').map(value => value.trim()) : [specifiedValue]
+      for (const value of values) {
+        if (!value) throw Object.assign(new Error('--account: Page selection must not contain empty members.'), { exitCode: 1 })
+        // Resolve handle (strip leading @, case-insensitive) or platformUserId.
+        const normalized = value.startsWith('@') ? value.slice(1) : value
+        const match = accounts.find(
+          (a) =>
+            a.platformUsername?.toLowerCase() === normalized.toLowerCase() ||
+            a.platformUserId === value,
         )
+        if (!match?.platformUserId) {
+          const valid = accounts
+            .map((a) => `  @${a.platformUsername ?? '?'} (${a.platformUserId ?? '?'})`)
+            .join('\n')
+          throw Object.assign(
+            new Error(
+              `--account: unknown ${platform} account "${value}".\n` +
+              `Connected accounts:\n${valid || '  (none)'}`,
+            ),
+            { exitCode: 1 },
+          )
+        }
+        if (!result[platform]) result[platform] = []
+        if (!result[platform]!.includes(match.platformUserId)) result[platform]!.push(match.platformUserId)
       }
-      if (!result[platform]) result[platform] = []
-      result[platform]!.push(match.platformUserId)
-    } else if (accounts.length >= 2) {
+    } else if (accounts.length >= 2 || (platform === 'facebook' && accounts.length > 0)) {
       if (isTty) {
         // ponytail: lazy import keeps @inquirer/prompts out of non-TTY/test paths
         const { checkbox } = await import('@inquirer/prompts')
@@ -166,7 +171,10 @@ export async function resolveTargetAccounts({
         )
       }
     }
-    // 0 or 1 account: omit from targetAccountIds — backend posts to all connected.
+    if (platform === 'facebook' && !result.facebook?.length) {
+      throw Object.assign(new Error('Facebook requires at least one explicitly selected connected Page. Pass --account facebook=<handle|id>.'), { exitCode: 1 })
+    }
+    // Other platforms retain their existing implicit single-account behavior.
   }
 
   return result

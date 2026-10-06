@@ -3,7 +3,7 @@ import type { Platform, MediaInput, InstagramOptions, ThreadsOptions, YoutubeOpt
 
 export type { MediaInput, InstagramOptions, ThreadsOptions, YoutubeOptions }
 
-const VALID_PLATFORMS: readonly Platform[] = ['x', 'linkedin', 'instagram', 'threads', 'youtube']
+const VALID_PLATFORMS: readonly Platform[] = ['x', 'linkedin', 'instagram', 'threads', 'youtube', 'facebook']
 
 const EXT_TO_MIME: Record<string, string> = {
   jpg: 'image/jpeg',

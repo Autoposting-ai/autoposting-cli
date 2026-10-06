@@ -37,6 +37,22 @@ function wrap<T>(data: T) {
 }
 
 describe('BrandsResource', () => {
+  it('prepares a browser handoff with only safe brand/platform context', async () => {
+    server.use(http.get(`${BASE}/brands/my-brand`, () => HttpResponse.json(wrap(mockBrand))))
+    const client = new Autoposting({ apiKey: 'test-key' })
+    const handoff = await client.brands.facebookConnection('my-brand')
+    expect(handoff).toEqual({ url: 'https://app.autoposting.ai/brands?brand=my-brand&platform=facebook', brandSlug: 'my-brand', platform: 'facebook' })
+    expect(JSON.stringify(handoff)).not.toContain('test-key')
+  })
+  it('retains typed Page identity and safe connection metadata', async () => {
+    const page: PlatformConnection = { platform: 'facebook', connected: true, platformAccountType: 'page',
+      platformUserId: 'page-1', platformUsername: 'My Page', tokenId: 'connection-1',
+      pageName: 'My Page', pagePictureUrl: 'https://example.com/page.png', scopes: ['pages_manage_posts'],
+      hasRefreshToken: false, refreshFailedAt: '2026-10-03T00:00:00Z' }
+    server.use(http.get(`${BASE}/brands/my-brand/auth/status`, () => HttpResponse.json(wrap([page]))))
+    const client = new Autoposting({ apiKey: 'test-key' })
+    expect(await client.brands.authStatus('my-brand')).toEqual([page])
+  })
   it('list() sends GET /brands and returns the bare array (envelope unwrapped)', async () => {
     server.use(
       http.get(`${BASE}/brands`, () => HttpResponse.json(wrap([mockBrand]))),

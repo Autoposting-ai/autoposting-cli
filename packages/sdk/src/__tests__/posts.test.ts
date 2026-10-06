@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 import { Autoposting } from '../client'
-import type { Post } from '../types/posts'
+import type { Post, CreatePostParams, UpdatePostParams } from '../types/posts'
 
 const BASE = 'https://app.autoposting.ai/api-proxy'
 
@@ -273,6 +273,18 @@ describe('posts.unschedule()', () => {
 })
 
 describe('posts.retry()', () => {
+  it('forwards explicit Facebook retry selection and preserves the accepted Page IDs', async () => {
+    let platform: string | null = null
+    const accepted = { id: 'post-1', status: 'publishing', retrying: ['facebook'], pageIds: ['failed-page'] }
+    server.use(http.post(`${BASE}/posts/post-1/retry`, ({ request }) => {
+      platform = new URL(request.url).searchParams.get('platform')
+      return HttpResponse.json(wrap(accepted), { status: 202 })
+    }))
+    const result = await makeClient().posts.retry('post-1', 'facebook')
+    expect(platform).toBe('facebook')
+    expect(result).toEqual(accepted)
+  })
+
   it('sends POST /posts/:id/retry', async () => {
     let retryCalled = false
     const post = makePost()
@@ -312,4 +324,45 @@ describe('posts.score()', () => {
     const result = await client.posts.score('post-1')
     expect(result.score).toBe(87)
   })
+})
+
+describe('Facebook SDK authoring', () => {
+  it.each(['text', 'link', 'photo', 'multi-photo', 'video', 'reel'] as const)('preserves explicit %s intent in create and update requests', async (format) => {
+    const body: CreatePostParams = { brandSlug: 'brand', text: 'Shared', platforms: ['facebook'],
+      facebookOptions: { format, ...(format === 'link' ? { link: 'https://example.com/article' } : {}) },
+      targetAccountIds: { facebook: ['page'] }, platformTexts: { facebook: '' }, platformMedia: { facebook: [] } }
+    const update: UpdatePostParams = { facebookOptions: body.facebookOptions,
+      targetAccountIds: body.targetAccountIds, platformTexts: body.platformTexts, platformMedia: body.platformMedia }
+    const requests: unknown[] = []
+    server.use(http.post(`${BASE}/posts`, async ({ request }) => { requests.push(await request.json()); return HttpResponse.json(wrap(makePost())) }),
+      http.put(`${BASE}/posts/post-1`, async ({ request }) => { requests.push(await request.json()); return HttpResponse.json(wrap(makePost())) }))
+    const client = makeClient()
+    await client.posts.create(body)
+    await client.posts.update('post-1', update)
+    expect(requests).toEqual([body, update])
+  })
+  it('retains mixed Page outcomes and safe remote identities', async () => {
+    const post: Post = makePost({ platforms: ['facebook'], status: 'partial', platformResults: { facebook: {
+      status: 'partial', accounts: [
+        { platformUserId: 'published-page', status: 'published', platformPostId: 'page_post', url: 'https://www.facebook.com/page/posts/post' },
+        { platformUserId: 'failed-page', status: 'failed', error: 'Reconnect this Page' },
+        { platformUserId: 'unknown-page', status: 'unknown', remoteIds: [{ id: 'video-id' }] },
+      ],
+    } } })
+    server.use(http.get(`${BASE}/posts/post-1`, () => HttpResponse.json(wrap(post))))
+    expect(await makeClient().posts.getById('post-1')).toEqual(post)
+  })
+})
+
+
+it('schedules explicit failed Facebook Page recovery and returns selected destinations', async () => {
+  const client = makeClient()
+  let capturedBody: unknown
+  server.use(http.put(`${BASE}/posts/post-1/schedule`, async ({ request }) => {
+    capturedBody = await request.json()
+    return HttpResponse.json(wrap({ id: 'post-1', status: 'scheduled', scheduledAt: '2027-01-01T10:00:00Z', pageIds: ['page-1'] }))
+  }))
+  const result = await client.posts.schedule('post-1', '2027-01-01T10:00:00Z', 'facebook')
+  expect(capturedBody).toEqual({ scheduledAt: '2027-01-01T10:00:00Z', platform: 'facebook' })
+  expect(result.pageIds).toEqual(['page-1'])
 })

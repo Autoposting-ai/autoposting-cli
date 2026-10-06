@@ -92,7 +92,7 @@ function rowToFields(row: Record<string, unknown>, cliBrand?: string): PostField
   if (!brand) {
     throw new Error('No brand: set "brand" in the row, pass --brand, or set a default context.')
   }
-  if (!row.text) throw new Error('Missing "text".')
+  if (typeof row.text !== 'string') throw new Error('Missing "text" or text is not a string.')
   if (!platforms) throw new Error('Missing "platforms".')
   // Array-typed fields can't be expressed in flat CSV (cells are always strings),
   // so a scalar here would misparse downstream (e.g. media.length = char count).
@@ -102,9 +102,37 @@ function rowToFields(row: Record<string, unknown>, cliBrand?: string): PostField
       throw new Error(`"${key}" is multi-value — use a JSON input file with an array (CSV can't express it).`)
     }
   }
+  let platformText = row.platformText as string[] | undefined
+  if (row.platformTexts !== undefined) {
+    if (!row.platformTexts || typeof row.platformTexts !== 'object' || Array.isArray(row.platformTexts)) throw new Error('platformTexts must map platforms to caption strings')
+    const captions = Object.entries(row.platformTexts).map(([platform, text]) => {
+      if (typeof text !== 'string') throw new Error('platformTexts values must be strings')
+      return `${platform}=${text}`
+    })
+    platformText = platformText ?? captions
+  }
+  let facebook: { format?: string; link?: string } | undefined
+  if (row.facebookOptions !== undefined) {
+    if (!row.facebookOptions || typeof row.facebookOptions !== 'object' || Array.isArray(row.facebookOptions)) throw new Error('facebookOptions must be an object')
+    facebook = row.facebookOptions as { format?: string; link?: string }
+    if (typeof facebook.format !== 'string' || facebook.link !== undefined && typeof facebook.link !== 'string') throw new Error('facebookOptions requires a string format and optional string link')
+  }
+  let account = row.account as string[] | undefined
+  if (row.targetAccountIds !== undefined) {
+    if (!row.targetAccountIds || typeof row.targetAccountIds !== 'object' || Array.isArray(row.targetAccountIds)) throw new Error('targetAccountIds must map platforms to account ID arrays')
+    const flags = Object.entries(row.targetAccountIds).map(([platform, ids]) => {
+      if (!Array.isArray(ids) || ids.length === 0 || ids.some(id => typeof id !== 'string' || !id.trim() || id.includes(','))) throw new Error('targetAccountIds requires nonempty account ID arrays')
+      return `${platform}=${ids.join(',')}`
+    })
+    account = account ?? flags
+  }
   return {
     ...(row as Partial<PostFields>),
+    ...(facebook ? { facebookFormat: facebook.format, facebookLink: facebook.link } : {}),
+    ...(account ? { account } : {}),
+    ...(platformText ? { platformText } : {}),
     brandSlug: brand,
+    at: (row.at ?? row.scheduledAt) as string | undefined,
     text: String(row.text),
     platforms: String(platforms),
   }

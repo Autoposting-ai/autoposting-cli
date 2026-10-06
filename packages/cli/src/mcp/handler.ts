@@ -1,5 +1,5 @@
 import type { Autoposting } from '@autoposting.ai/sdk'
-import type { CreateClipDraftParams, MediaInput, Platform } from '@autoposting.ai/sdk'
+import type { CreateClipDraftParams, MediaInput, Platform, CreatePostParams } from '@autoposting.ai/sdk'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { readFile } from 'node:fs/promises'
 import { basename } from 'node:path'
@@ -13,8 +13,46 @@ const PLATFORMS: Platform[] = [
   'instagram',
   'threads',
   'youtube',
+  'facebook',
 ]
 const PLATFORM_SET = new Set<string>(PLATFORMS)
+
+function validateAuthoringIntent(args: ToolArgs): void {
+  const object = (value: unknown, field: string): Record<string, unknown> => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${field} must be an object.`)
+    return value as Record<string, unknown>
+  }
+  if (args.facebookOptions !== undefined) {
+    const options = object(args.facebookOptions, 'facebookOptions')
+    if (!['text', 'link', 'photo', 'multi-photo', 'video', 'reel'].includes(options.format as string)) {
+      throw new Error('facebookOptions.format must be a supported Facebook format.')
+    }
+    if (options.link !== undefined && typeof options.link !== 'string') throw new Error('facebookOptions.link must be a string.')
+    if (Object.keys(options).some(key => !['format', 'link'].includes(key))) throw new Error('Unknown facebookOptions field.')
+  }
+  for (const field of ['targetAccountIds', 'platformTexts', 'platformMedia'] as const) {
+    if (args[field] === undefined) continue
+    for (const [platform, value] of Object.entries(object(args[field], field))) {
+      if (!PLATFORM_SET.has(platform)) throw new Error(`Invalid platform in ${field}.`)
+      if (field === 'platformTexts') {
+        if (typeof value !== 'string') throw new Error('Platform captions must be strings.')
+      } else if (field === 'targetAccountIds') {
+        if (!Array.isArray(value) || value.length === 0 || value.some(id => typeof id !== 'string' || !id.trim()) || new Set(value).size !== value.length) {
+          throw new Error('Target account IDs must be a nonempty array of unique IDs.')
+        }
+      } else {
+        if (!Array.isArray(value)) throw new Error('Platform media must be an array.')
+        for (const item of value) {
+          const media = object(item, 'Media item')
+          if (typeof media.url !== 'string' || !media.url.trim() || !['image', 'video', 'gif'].includes(media.type as string)) {
+            throw new Error('Media items require a URL and image, video or gif type.')
+          }
+          if (media.altText !== undefined && typeof media.altText !== 'string') throw new Error('Media altText must be a string.')
+        }
+      }
+    }
+  }
+}
 
 function ok(data: unknown): CallToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] }
@@ -26,9 +64,15 @@ function fail(error: unknown): CallToolResult {
 }
 
 function parsePlatforms(raw: unknown): Platform[] {
-  if (typeof raw !== 'string') return []
-  const platforms = raw
-    .split(',')
+  if (raw === undefined) return []
+  if (typeof raw !== 'string' && !Array.isArray(raw)) {
+    throw new Error('Platforms must be a comma-separated string or an array of platform names.')
+  }
+  const values = typeof raw === 'string' ? raw.split(',') : raw
+  if (values.some((value) => typeof value !== 'string')) {
+    throw new Error('Every platform must be a platform name.')
+  }
+  const platforms = (values as string[])
     .map((p) => p.trim())
     .filter(Boolean)
   const invalid = platforms.filter((platform) => !PLATFORM_SET.has(platform))
@@ -74,6 +118,7 @@ async function dispatchToolCall(
   args: ToolArgs,
   client: Autoposting,
 ): Promise<CallToolResult> {
+  if (name === 'create-post' || name === 'update-post') validateAuthoringIntent(args)
   switch (name) {
     case 'delete-account-import': return ok(await client.accountOnboarding.remove(args.id as string))
     case 'import-accounts': return ok(await client.accountOnboarding.create({ csv: args.csv as string }))
@@ -109,12 +154,16 @@ async function dispatchToolCall(
           ? { scheduledAt: args.scheduledAt as string }
           : {}),
         ...(args.media ? { media: args.media as MediaInput[] } : {}),
+        ...(args.facebookOptions !== undefined ? { facebookOptions: args.facebookOptions as CreatePostParams['facebookOptions'] } : {}),
+        ...(args.targetAccountIds !== undefined ? { targetAccountIds: args.targetAccountIds as CreatePostParams['targetAccountIds'] } : {}),
+        ...(args.platformTexts !== undefined ? { platformTexts: args.platformTexts as CreatePostParams['platformTexts'] } : {}),
+        ...(args.platformMedia !== undefined ? { platformMedia: args.platformMedia as CreatePostParams['platformMedia'] } : {}),
       })
       return ok(result)
     }
     case 'update-post': {
       const result = await client.posts.update(args.id as string, {
-        ...(args.text ? { text: args.text as string } : {}),
+        ...(args.text !== undefined ? { text: args.text as string } : {}),
         ...(args.platforms
           ? {
               platforms: parsePlatforms(args.platforms),
@@ -124,6 +173,10 @@ async function dispatchToolCall(
           ? { scheduledAt: args.scheduledAt as string }
           : {}),
         ...(args.media ? { media: args.media as MediaInput[] } : {}),
+        ...(args.facebookOptions !== undefined ? { facebookOptions: args.facebookOptions as CreatePostParams['facebookOptions'] } : {}),
+        ...(args.targetAccountIds !== undefined ? { targetAccountIds: args.targetAccountIds as CreatePostParams['targetAccountIds'] } : {}),
+        ...(args.platformTexts !== undefined ? { platformTexts: args.platformTexts as CreatePostParams['platformTexts'] } : {}),
+        ...(args.platformMedia !== undefined ? { platformMedia: args.platformMedia as CreatePostParams['platformMedia'] } : {}),
       })
       return ok(result)
     }
@@ -136,14 +189,16 @@ async function dispatchToolCall(
       return ok(result)
     }
     case 'schedule-post': {
-      const result = await client.posts.schedule(
-        args.id as string,
-        args.scheduledAt as string,
-      )
+      if (args.platform !== undefined && args.platform !== 'facebook') throw new Error('Scheduled recovery requires platform facebook')
+      const result = args.platform === 'facebook'
+        ? await client.posts.schedule(args.id as string, args.scheduledAt as string, 'facebook')
+        : await client.posts.schedule(args.id as string, args.scheduledAt as string)
       return ok(result)
     }
     case 'retry-post': {
-      const result = await client.posts.retry(args.id as string)
+      const platforms = args.platform === undefined ? undefined : parsePlatforms(args.platform)
+      if (platforms && platforms.length !== 1) throw new Error('Retry requires exactly one platform')
+      const result = platforms ? await client.posts.retry(args.id as string, platforms[0]!) : await client.posts.retry(args.id as string)
       return ok(result)
     }
     case 'rewrite-post': {
