@@ -7,9 +7,10 @@ import {
 import { Autoposting, VERSION } from '@autoposting.ai/sdk'
 import { ALL_TOOLS } from './tools.js'
 import { handleToolCall } from './handler.js'
+import { resolveAuth } from '../auth/auth-manager.js'
 
-export async function startMcpServer(): Promise<void> {
-  const client = new Autoposting() // reads AUTOPOSTING_API_KEY from env
+export async function startMcpServer(options?: { apiKey?: string }): Promise<void> {
+  const client = new Autoposting({ apiKey: resolveAuth(options).apiKey })
 
   const server = new Server(
     { name: 'autoposting-mcp', version: VERSION },
