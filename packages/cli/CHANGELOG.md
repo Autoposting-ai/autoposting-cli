@@ -1,5 +1,13 @@
 # autoposting-cli
 
+## 0.5.4
+
+### Patch Changes
+
+- 96a7813: Use normal CLI credential precedence when starting MCP, including saved login profiles and explicit API keys. Report missing login without corrupting MCP protocol output.
+- Updated dependencies [96a7813]
+  - @autoposting.ai/sdk@0.5.4
+
 ## 0.5.3
 
 ### Patch Changes
