@@ -38,7 +38,7 @@ export interface MockApi {
 
 const UPLOADED = { url: 'https://cdn.example/uploaded.png', type: 'image', filename: 'uploaded.png' }
 
-export async function startMockApi(opts: { accounts?: MockAccount[]; facebookRetryStatus?: 202 | 409 } = {}): Promise<MockApi> {
+export async function startMockApi(opts: { accounts?: MockAccount[]; facebookRetryStatus?: 202 | 409; expectedApiKey?: string } = {}): Promise<MockApi> {
   const accounts = (opts.accounts ?? []).map((a) => ({ connected: true, ...a }))
   const requests: CapturedRequest[] = []
 
@@ -62,6 +62,10 @@ export async function startMockApi(opts: { accounts?: MockAccount[]; facebookRet
       const send = (data: unknown, status = 200) => {
         res.writeHead(status, { 'content-type': 'application/json' })
         res.end(JSON.stringify({ success: true, data }))
+      }
+
+      if (opts.expectedApiKey && req.headers.authorization !== `Bearer ${opts.expectedApiKey}`) {
+        return send({ error: 'Unexpected test credential' }, 401)
       }
 
       if (req.method === 'GET' && url.includes('/auth/status')) return send(accounts)

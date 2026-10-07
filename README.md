@@ -401,6 +401,11 @@ The CLI includes a built-in MCP (Model Context Protocol) server with **51 tools*
 ap mcp
 ```
 
+The MCP server uses the same login as other CLI commands: `--api-key`, then
+`AUTOPOSTING_API_KEY`, then the active profile saved by `ap auth login`.
+When using a saved profile, run the MCP client under the same OS user and config
+directory; no key needs to be copied into the client configuration.
+
 ### Claude Desktop Configuration
 
 Add to your `claude_desktop_config.json`:
