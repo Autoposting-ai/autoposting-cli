@@ -357,7 +357,7 @@ describe('MCP schedule cancellation', () => {
     const client = { posts: { unschedule: async (id: string) => { calls.push(id); return restored } } }
     const result = await handleToolCall('cancel-schedule', { id: 'post' }, client as never)
     expect(result.isError).not.toBe(true)
-    expect(JSON.parse(result.content[0]!.text)).toEqual(restored)
+    expect(result.content[0]).toMatchObject({ type: 'text', text: JSON.stringify(restored, null, 2) })
     expect(calls).toEqual(['post'])
   })
 
@@ -375,6 +375,6 @@ describe('MCP schedule cancellation', () => {
     const client = { posts: { unschedule: async () => { throw new Error('Post is already publishing') } } }
     const result = await handleToolCall('cancel-schedule', { id: 'post' }, client as never)
     expect(result.isError).toBe(true)
-    expect(result.content[0]!.text).toBe('Post is already publishing')
+    expect(result.content[0]).toMatchObject({ type: 'text', text: 'Post is already publishing' })
   })
 })
