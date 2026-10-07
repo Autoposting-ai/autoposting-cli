@@ -342,3 +342,39 @@ it('preserves an intentionally empty main caption when updating a Facebook photo
     facebookOptions: { format: 'photo' }, targetAccountIds: { facebook: ['page'] },
   }])
 })
+
+
+describe('MCP schedule cancellation', () => {
+  it('advertises cancellation and preserves the restored Facebook outcome', async () => {
+    expect(ALL_TOOLS.find(tool => tool.name === 'cancel-schedule')?.inputSchema).toMatchObject({
+      required: ['id'], additionalProperties: false,
+    })
+    const restored = { id: 'post', status: 'partial', platformResults: { facebook: { accounts: [
+      { accountId: 'published-page', status: 'published', platformPostId: 'remote-post' },
+      { accountId: 'unknown-page', status: 'unknown' },
+    ] } } }
+    const calls: string[] = []
+    const client = { posts: { unschedule: async (id: string) => { calls.push(id); return restored } } }
+    const result = await handleToolCall('cancel-schedule', { id: 'post' }, client as never)
+    expect(result.isError).not.toBe(true)
+    expect(JSON.parse(result.content[0]!.text)).toEqual(restored)
+    expect(calls).toEqual(['post'])
+  })
+
+  it('rejects invalid IDs and scheduling fields without cancelling anything', async () => {
+    let calls = 0
+    const client = { posts: { unschedule: async () => { calls++; return {} } } }
+    for (const args of [{}, { id: null }, { id: 1 }, { id: '' }, { id: '  ' },
+      { id: 'post', scheduledAt: '2027-01-01T10:00:00Z' }, { id: 'post', platform: 'facebook' }]) {
+      expect((await handleToolCall('cancel-schedule', args, client as never)).isError).toBe(true)
+    }
+    expect(calls).toBe(0)
+  })
+
+  it('returns a cancellation failure instead of claiming success', async () => {
+    const client = { posts: { unschedule: async () => { throw new Error('Post is already publishing') } } }
+    const result = await handleToolCall('cancel-schedule', { id: 'post' }, client as never)
+    expect(result.isError).toBe(true)
+    expect(result.content[0]!.text).toBe('Post is already publishing')
+  })
+})

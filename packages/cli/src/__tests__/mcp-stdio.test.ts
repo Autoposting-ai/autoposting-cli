@@ -107,4 +107,29 @@ describe('compiled Facebook MCP stdio contract', () => {
       await api.close()
     }
   }, 15000)
+
+  it('discovers cancellation and sends exactly one cancel request', async () => {
+    const api = await startMockApi()
+    const transport = new StdioClientTransport({ command: process.execPath, args: [cli, 'mcp'],
+      env: { PATH: process.env.PATH ?? '', AUTOPOSTING_API_KEY: 'fixture-key', AUTOPOSTING_BASE_URL: api.url }, stderr: 'pipe' })
+    const client = new Client({ name: 'schedule-cancellation-test', version: '1.0.0' })
+    try {
+      await client.connect(transport)
+      expect((await client.listTools()).tools.map(tool => tool.name)).toContain('cancel-schedule')
+      const result = await client.callTool({ name: 'cancel-schedule', arguments: { id: 'post-1' } })
+      expect(result.isError).not.toBe(true)
+      expect(JSON.stringify(result.content)).toContain('draft')
+      expect(api.requests.map(request => [request.method, request.path, request.jsonBody])).toEqual([
+        ['PUT', '/posts/post-1/schedule', { cancel: true }],
+      ])
+      const invalid = await client.callTool({ name: 'cancel-schedule', arguments: { id: 'post-1', scheduledAt: '2027-01-01T10:00:00Z' } })
+      expect(invalid.isError).toBe(true)
+      expect(api.requests).toHaveLength(1)
+    } finally {
+      await client.close()
+      await transport.close()
+      await api.close()
+    }
+  }, 15000)
+
 })

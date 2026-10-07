@@ -148,6 +148,16 @@ export const ALL_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'cancel-schedule',
+    description: 'Cancel a scheduled post. Normal scheduling returns to draft; Facebook recovery restores the previous outcome without republishing.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', minLength: 1, pattern: '\\S', description: 'Post ID whose schedule should be cancelled' } },
+      required: ['id'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'retry-post',
     description: 'Retry publishing a failed post.',
     inputSchema: {
