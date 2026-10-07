@@ -395,7 +395,7 @@ try {
 
 ## MCP Server
 
-The CLI includes a built-in MCP (Model Context Protocol) server with **51 tools** covering all SDK resources. Use it with Claude Desktop, Cursor, or any MCP-compatible client.
+The CLI includes a built-in MCP (Model Context Protocol) server with **68 tools** covering all SDK resources. Use it with Claude Desktop, Cursor, or any MCP-compatible client.
 
 ```bash
 ap mcp
@@ -405,6 +405,8 @@ The MCP server uses the same login as other CLI commands: `--api-key`, then
 `AUTOPOSTING_API_KEY`, then the active profile saved by `ap auth login`.
 When using a saved profile, run the MCP client under the same OS user and config
 directory; no key needs to be copied into the client configuration.
+
+Cancel a schedule with `cancel-schedule` and `{"id":"post-id"}`. It uses the same cancellation endpoint as `ap posts schedule post-id --cancel` and `client.posts.unschedule('post-id')`. Normal scheduling returns to draft; cancelling Facebook recovery restores the previous outcome without republishing. Do not pass a date or platform to cancellation.
 
 ### Claude Desktop Configuration
 
@@ -424,9 +426,9 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-### Available Tools (51)
+### Available Tools (68)
 
-Posts (10) · Brands (6) · Agents (8) · KB (7) · Ideas (4) · Clips (5) · Carousels (6) · Webhooks (6) · Billing (2) · Usage (1)
+See the complete [MCP tool catalog](https://docs.autoposting.ai/mcp/tools) for every tool and its input schema.
 
 All tools use correct domain terminology (`brandSlug`, `text`) and follow kebab-case naming (`create-post`, `list-brands`, `run-agent`).
 

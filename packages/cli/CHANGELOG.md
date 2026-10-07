@@ -1,5 +1,13 @@
 # autoposting-cli
 
+## 0.5.5
+
+### Patch Changes
+
+- Expose cancel-schedule in the CLI-hosted MCP server using the existing SDK unschedule method, with strict input validation and unchanged Facebook recovery outcomes.
+- Updated dependencies
+  - @autoposting.ai/sdk@0.5.5
+
 ## 0.5.4
 
 ### Patch Changes

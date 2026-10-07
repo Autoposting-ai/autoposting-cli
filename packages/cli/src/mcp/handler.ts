@@ -195,6 +195,12 @@ async function dispatchToolCall(
         : await client.posts.schedule(args.id as string, args.scheduledAt as string)
       return ok(result)
     }
+    case 'cancel-schedule': {
+      if (typeof args.id !== 'string' || !args.id.trim() || Object.keys(args).some(key => key !== 'id')) {
+        throw new Error('cancel-schedule requires only a non-empty post id')
+      }
+      return ok(await client.posts.unschedule(args.id))
+    }
     case 'retry-post': {
       const platforms = args.platform === undefined ? undefined : parsePlatforms(args.platform)
       if (platforms && platforms.length !== 1) throw new Error('Retry requires exactly one platform')
